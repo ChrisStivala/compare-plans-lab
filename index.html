@@ -18,6 +18,8 @@ cp-icon{display:inline-flex;line-height:0}
 img,svg,cp-icon{-webkit-user-drag:none;user-drag:none;-webkit-user-select:none;user-select:none}
 a{color:#232323}
 button{font-family:inherit}
+.cp-link{text-decoration:underline;text-decoration-color:#C4C4C4;text-decoration-thickness:1.4px;text-underline-offset:3px;cursor:pointer;transition:color .15s ease,text-decoration-color .15s ease}
+.cp-link:hover{color:#1A73E8 !important;text-decoration-color:#1A73E8}
 @keyframes cpFade{from{opacity:0}to{opacity:1}}
 @keyframes cpFadeOut{from{opacity:1}to{opacity:0}}
 @keyframes cpDrop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
@@ -172,10 +174,11 @@ function activePlans(){
 /* ── Card HTML ──────────────────────────────────────────────── */
 function perkRow(pk,rowH){
   const hasMod=!!pk.modal;
-  const deco=hasMod?'text-decoration:underline dotted;text-decoration-color:rgba(0,0,0,.4);text-decoration-thickness:1.4px;text-underline-offset:auto;text-underline-position:from-font':'text-decoration:none';
+  const cls=hasMod?' class="cp-link"':'';
+  const deco=hasMod?'':'text-decoration:none';
   return`<div${hasMod?` data-modal="${pk.modal}"`:''}style="display:flex;gap:12px;align-items:center;min-height:${rowH||48}px;cursor:${hasMod?'pointer':'default'}">
   <div style="width:24px;height:24px;flex-shrink:0;display:flex;align-items:center;justify-content:center"><cp-icon name="${pk.icon}" size="24"></cp-icon></div>
-  <span style="font-weight:400;font-size:14px;line-height:28px;color:#505050;${deco}">${pk.text}</span>
+  <span${cls} style="font-weight:400;font-size:14px;line-height:28px;color:#505050;${deco}">${pk.text}</span>
 </div>`;
 }
 
@@ -224,7 +227,7 @@ function cardHTML(plan,lo){
 
   const tagH=tag?`<span style="position:absolute;top:4px;right:24px;background:${tagColor};color:#fff;font-weight:700;font-size:13px;line-height:18px;padding:5px 11px;border-radius:16px 16px 16px 4px;white-space:nowrap">${tag}</span>`:'';
   const showAddons=showElec;
-  const creditLink=plan.id==='go'?`<span data-modal="credit" style="align-self:flex-start;font-weight:500;font-size:12px;line-height:20px;color:#797979;text-decoration:underline dotted;text-decoration-color:rgba(0,0,0,.55);text-decoration-thickness:2px;text-underline-offset:4px;cursor:pointer">Price estimate excludes credits</span>`:'';
+  const creditLink=plan.id==='go'?`<span data-modal="credit" class="cp-link" style="align-self:flex-start;font-weight:500;font-size:12px;line-height:20px;color:#797979">Price estimate excludes credits</span>`:'';
 
   return`<div data-plan-id="${plan.id}" style="scroll-snap-align:start;flex-shrink:0;width:${cWidth};--cw:${slotPx}px;border-radius:32px;background:#fff;border:1px solid transparent;padding:32px 16px;display:flex;flex-direction:column;gap:32px;animation:${anim}">
 <div style="display:flex;flex-direction:column;gap:16px;align-items:center">
