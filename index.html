@@ -1000,9 +1000,14 @@ function onRailDown(e){
 }
 
 /* ── Layout on resize ───────────────────────────────────────── */
-let _resizeTimer;
+let _resizeTimer,_lastW=window.innerWidth;
 function onResize(){
-  S.vw=window.innerWidth;
+  const w=window.innerWidth;
+  // Ignore height-only changes (Safari toolbar show/hide on scroll fires
+  // resize with the same width — rebuilding the shell would reset scroll).
+  if(w===_lastW) return;
+  _lastW=w;
+  S.vw=w;
   clearTimeout(_resizeTimer);
   _resizeTimer=setTimeout(()=>{
     buildShell();cacheRefs();
