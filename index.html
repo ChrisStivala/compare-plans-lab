@@ -605,7 +605,8 @@ function updateCarousel(){
   const pad=lo.isWide?`4px max(40px, calc((100vw - ${lo.TRACK}px) / 2)) 14px max(40px, calc((100vw - ${lo.TRACK}px) / 2))`:'0 16px 8px';
   const scrollPad=lo.isWide?`max(40px, calc((100vw - ${lo.TRACK}px) / 2))`:'16px';
   const mask=lo.isWide?`linear-gradient(to right, transparent 0, #000 ${_m}px, #000 calc(100% - ${_m}px), transparent 100%)`:'none';
-  _car.style.cssText=`display:flex;overflow-x:auto;scroll-snap-type:x proximity;outline:none;cursor:${lo.isWide?'grab':'auto'};gap:${cgap};padding:${pad};scroll-padding-left:${scrollPad};-webkit-mask-image:${mask};mask-image:${mask}`;
+  const snap=lo.isWide?'x proximity':'x mandatory';
+  _car.style.cssText=`display:flex;overflow-x:auto;scroll-snap-type:${snap};outline:none;cursor:${lo.isWide?'grab':'auto'};gap:${cgap};padding:${pad};scroll-padding-left:${scrollPad};-webkit-mask-image:${mask};mask-image:${mask}`;
   _car.innerHTML=plans.map(p=>cardHTML(p,lo)).join('');
   _car.scrollLeft=saved;
   updateCounts();
@@ -757,6 +758,9 @@ function toggleAddon(name){
     S.entering={...S.entering,[id]:true};
     S.exiting=ex;
     updateCarousel();updateAddonFilters();
+    // New card is inserted at the front; scroll the carousel to it so the
+    // swoop-in animation is in frame (especially on mobile when scrolled over).
+    if(_car) smoothScrollX(_car,0,520);
     _enterTimers[id]=setTimeout(()=>{delete _enterTimers[id];const en={...S.entering};delete en[id];S.entering=en;},600);
   } else {
     const en={...S.entering};delete en[id];
@@ -895,9 +899,10 @@ function smoothScrollX(el,target,dur){
   const max=el.scrollWidth-el.clientWidth;
   target=Math.max(0,Math.min(target,max));
   const start=el.scrollLeft,dist=target-start,t0=performance.now();
+  const prevSnap=el.style.scrollSnapType;
   el.style.scrollSnapType='none';
   const ease=p=>1-Math.pow(1-p,3);
-  const step=now=>{const p=Math.min(1,(now-t0)/dur);el.scrollLeft=start+dist*ease(p);if(p<1)_scrollRaf=requestAnimationFrame(step);else{_scrollRaf=0;el.style.scrollSnapType='';}};
+  const step=now=>{const p=Math.min(1,(now-t0)/dur);el.scrollLeft=start+dist*ease(p);if(p<1)_scrollRaf=requestAnimationFrame(step);else{_scrollRaf=0;el.style.scrollSnapType=prevSnap;}};
   _scrollRaf=requestAnimationFrame(step);
 }
 function readCar(){
