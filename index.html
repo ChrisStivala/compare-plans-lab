@@ -196,7 +196,7 @@ function cardHTML(plan,lo){
   const gTrans=gasInstant?'none':'grid-template-rows .44s cubic-bezier(.4,0,.2,1),margin-top .44s cubic-bezier(.4,0,.2,1),opacity .3s ease';
   const gAccTrans=gasInstant?'none':'grid-template-rows .44s cubic-bezier(.4,0,.2,1),opacity .3s ease';
   const gGrid=showGas?'1fr':'0fr';
-  const gMt=showGas?(showElec?'-48px':'0'):'-56px';
+  const gMt=showGas?(showElec?'-24px':'0'):'-56px';
   const gOp=showGas?'1':'0';
   const rRows=ratesOpen?'1fr':'0fr',gRRows=gasRatesOpen?'1fr':'0fr';
   const rVbar=`scaleY(${ratesOpen?0:1})`,gRVbar=`scaleY(${gasRatesOpen?0:1})`;
@@ -737,7 +737,7 @@ function updateGasStyles(){
   const gAccTrans=S.gasInstant?'none':'grid-template-rows .44s cubic-bezier(.4,0,.2,1),opacity .3s ease';
   document.querySelectorAll('[data-plan-id]').forEach(card=>{
     const gs=card.querySelector('[data-gas-section]');
-    if(gs){gs.style.gridTemplateRows=showGas?'1fr':'0fr';gs.style.marginTop=showGas?(showElec?'-48px':'0'):'-56px';gs.style.opacity=showGas?'1':'0';gs.style.transition=gTrans;}
+    if(gs){gs.style.gridTemplateRows=showGas?'1fr':'0fr';gs.style.marginTop=showGas?(showElec?'-24px':'0'):'-56px';gs.style.opacity=showGas?'1':'0';gs.style.transition=gTrans;}
     const ga=card.querySelector('[data-gas-acc]');
     if(ga){ga.style.gridTemplateRows=showGas?'1fr':'0fr';ga.style.opacity=showGas?'1':'0';ga.style.transition=gAccTrans;}
   });
