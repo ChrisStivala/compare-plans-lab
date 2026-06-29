@@ -558,7 +558,7 @@ function buildShell(){
         <button data-fuel="Both" style="position:relative;z-index:1;${lo.isWide?'flex:0 0 auto;padding:0 24px':'flex:1'};border:0;background:transparent;cursor:pointer;border-radius:28px;height:56px;font-weight:600;font-size:14px;white-space:nowrap;color:#505050;transition:color .3s ease">Both</button>
       </div>
       <div id="addon-filters" style="display:flex;gap:16px"></div>
-      <div id="results-bar" style="display:${lo.isWide?'flex':'none'};${(S.vw<1400)?'flex:1 1 100%':'flex:1 1 320px;min-width:280px'};align-items:center;justify-content:flex-end;gap:16px">
+      <div id="results-bar" style="display:${lo.isWide?'flex':'none'};${(S.vw<1400)?'flex:1 1 100%':'flex:1 1 320px;min-width:280px'};align-items:center;justify-content:${(S.vw<1400)?'space-between':'flex-end'};gap:16px">
         <span id="results-count" style="font-weight:400;font-size:15px;color:#505050;white-space:nowrap"></span>
         <div style="display:flex;gap:8px">
           <button id="btn-prev" aria-label="Previous" style="width:40px;height:40px;border-radius:50%;border:1px solid #D8D8D8;background:#fff;color:#232323;display:flex;align-items:center;justify-content:center;transition:opacity .2s,box-shadow .2s;cursor:pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 L8 12 L15 19"></path></svg></button>
