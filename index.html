@@ -277,16 +277,18 @@ function cardHTML(plan,lo){
     </div>
   </div>
   <div style="padding:0 12px;display:flex;flex-direction:column;gap:12px">
-    <div style="display:flex;align-items:center;gap:12px;min-height:${titleMinH}px">
-      <div style="display:flex;flex-direction:column;gap:2px">
-        <span style="font-weight:500;font-size:14px;line-height:20px;color:#232323">What's included with</span>
-        <span style="font-weight:500;font-size:14px;line-height:20px;color:#232323">${inclPlanName}</span>
+    <div style="display:flex;flex-direction:column;justify-content:flex-end;min-height:${titleMinH}px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-weight:500;font-size:14px;line-height:20px;color:#232323">What's included with</span>
+          <span style="font-weight:500;font-size:14px;line-height:20px;color:#232323">${inclPlanName}</span>
+        </div>
+        <div style="flex:1 1 16px;min-width:12px;height:1px;background:#D8D8D8"></div>
       </div>
-      <div style="flex:1 1 16px;min-width:12px;height:1px;background:#D8D8D8"></div>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">${included.map(p=>perkRow(p,rowH)).join('')}</div>
   </div>
-  ${showAddons&&plan.addable&&plan.addable.length?`<div style="padding:0 12px;display:flex;flex-direction:column;gap:16px">
+  ${showAddons&&plan.addable&&plan.addable.length?`<div style="padding:0 12px;display:flex;flex-direction:column;gap:12px">
     <div style="display:flex;align-items:center;gap:12px">
       <span style="font-weight:500;font-size:14px;line-height:20px;color:#232323;white-space:nowrap">Things you can add</span>
       <div style="flex:1 1 16px;min-width:12px;height:1px;background:#D8D8D8"></div>
