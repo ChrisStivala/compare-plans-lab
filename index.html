@@ -206,10 +206,13 @@ function cardHTML(plan,lo){
   // Tablet cards are narrowest (≈262px at 768px), where the Go offer still
   // wraps to 3 lines; mobile (300px) and desktop fit 2 lines, so use tight rows.
   const rowH=lo.isTablet?72:48;
-  const addMin=rowH*2+14;
+  const addMin=rowH*2+16;
+  // Price block → "What's included" should be 46px; the section container gap
+  // is 32px (used for included → add-ons), so add the difference as margin.
+  const incMt=18;
   // Reserve a 2-line title height on narrow cards so a wrapping plan name
   // (e.g. "Origin Everyday Rewards Variable") doesn't shift cards out of line.
-  const titleMinH=lo.isDesktop?0:62;
+  const titleMinH=62;
 
   let iconH='';
   if(plan.id==='edr') iconH=`<img src="project/assets/everyday-rewards.png" alt="Everyday Rewards" style="height:88px;width:106px;display:block">`;
@@ -233,7 +236,7 @@ function cardHTML(plan,lo){
     <div style="height:72px;padding-top:8px;text-align:center"><span style="font-weight:400;font-size:14px;line-height:24px;color:#505050">${plan.tagline}</span></div>
   </div>
 </div>
-<div style="display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:32px">
   ${showElec?`<div style="border-radius:24px;background:#F6F6F6;padding:32px;display:flex;flex-direction:column;gap:16px">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <span style="font-weight:500;font-size:16px;line-height:24px;color:#232323">Electricity</span>
@@ -276,7 +279,7 @@ function cardHTML(plan,lo){
       </div>
     </div>
   </div>
-  <div style="padding:0 12px;display:flex;flex-direction:column;gap:12px">
+  <div style="padding:0 12px;display:flex;flex-direction:column;gap:16px;margin-top:${incMt}px">
     <div style="display:flex;flex-direction:column;justify-content:flex-end;min-height:${titleMinH}px">
       <div style="display:flex;align-items:center;gap:12px">
         <div style="display:flex;flex-direction:column;gap:2px">
@@ -286,14 +289,14 @@ function cardHTML(plan,lo){
         <div style="flex:1 1 16px;min-width:12px;height:1px;background:#D8D8D8"></div>
       </div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:14px">${included.map(p=>perkRow(p,rowH)).join('')}</div>
+    <div style="display:flex;flex-direction:column;gap:16px">${included.map(p=>perkRow(p,rowH)).join('')}</div>
   </div>
-  ${showAddons&&plan.addable&&plan.addable.length?`<div style="padding:0 12px;display:flex;flex-direction:column;gap:12px">
+  ${showAddons&&plan.addable&&plan.addable.length?`<div style="padding:0 12px;display:flex;flex-direction:column;gap:16px">
     <div style="display:flex;align-items:center;gap:12px">
       <span style="font-weight:500;font-size:14px;line-height:20px;color:#232323;white-space:nowrap">Things you can add</span>
       <div style="flex:1 1 16px;min-width:12px;height:1px;background:#D8D8D8"></div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:14px;min-height:${addMin}px">${plan.addable.map(p=>perkRow(p,rowH)).join('')}</div>
+    <div style="display:flex;flex-direction:column;gap:16px;min-height:${addMin}px">${plan.addable.map(p=>perkRow(p,rowH)).join('')}</div>
   </div>`:''}
 </div>
 <div style="padding:0 16px">
