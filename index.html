@@ -200,8 +200,7 @@ function cardHTML(plan,lo){
   const gOp=showGas?'1':'0';
   const rRows=ratesOpen?'1fr':'0fr',gRRows=gasRatesOpen?'1fr':'0fr';
   const rVbar=`scaleY(${ratesOpen?0:1})`,gRVbar=`scaleY(${gasRatesOpen?0:1})`;
-  const inclParts=plan.includedTitle.split("What's included with ");
-  const inclPlanName=inclParts.length>1?inclParts[1]:plan.includedTitle;
+  const inclPlanName=plan.includedTitle.replace(/^What.s included with\s+/i,'');
 
   let iconH='';
   if(plan.id==='edr') iconH=`<img src="project/assets/everyday-rewards.png" alt="Everyday Rewards" style="height:88px;width:106px;display:block">`;
@@ -269,19 +268,17 @@ function cardHTML(plan,lo){
     </div>
   </div>
   <div style="padding:0 12px;display:flex;flex-direction:column;gap:16px">
-    <div style="display:flex;flex-direction:column;gap:2px">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-weight:500;font-size:14px;line-height:20px;color:#232323;white-space:nowrap">What's included with</span>
-        <div style="flex:1;height:1px;background:#D8D8D8"></div>
-      </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <span style="font-weight:500;font-size:14px;line-height:20px;color:#232323">What's included with</span>
+      <div style="height:1px;background:#D8D8D8"></div>
       <span style="font-weight:500;font-size:14px;line-height:20px;color:#232323">${inclPlanName}</span>
     </div>
     <div style="display:flex;flex-direction:column;gap:24px">${included.map(perkRow).join('')}</div>
   </div>
   ${showAddons&&plan.addable&&plan.addable.length?`<div style="padding:0 12px;display:flex;flex-direction:column;gap:16px">
-    <div style="display:flex;align-items:center;gap:10px">
-      <span style="font-weight:500;font-size:14px;line-height:20px;color:#232323;white-space:nowrap">Things you can add</span>
-      <div style="flex:1;height:1px;background:#D8D8D8"></div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <span style="font-weight:500;font-size:14px;line-height:20px;color:#232323">Things you can add</span>
+      <div style="height:1px;background:#D8D8D8"></div>
     </div>
     <div style="display:flex;flex-direction:column;gap:24px;min-height:168px">${plan.addable.map(perkRow).join('')}</div>
   </div>`:''}
