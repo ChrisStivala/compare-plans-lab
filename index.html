@@ -173,7 +173,7 @@ function activePlans(){
 function perkRow(pk){
   const hasMod=!!pk.modal;
   const deco=hasMod?'text-decoration:underline dotted;text-decoration-color:rgba(0,0,0,.4);text-decoration-thickness:1.4px;text-underline-offset:auto;text-underline-position:from-font':'text-decoration:none';
-  return`<div${hasMod?` data-modal="${pk.modal}"`:''}style="display:flex;gap:12px;align-items:center;min-height:72px;cursor:${hasMod?'pointer':'default'}">
+  return`<div${hasMod?` data-modal="${pk.modal}"`:''}style="display:flex;gap:12px;align-items:center;min-height:48px;cursor:${hasMod?'pointer':'default'}">
   <div style="width:24px;height:24px;flex-shrink:0;display:flex;align-items:center;justify-content:center"><cp-icon name="${pk.icon}" size="24"></cp-icon></div>
   <span style="font-weight:400;font-size:14px;line-height:24px;color:#505050;${deco}">${pk.text}</span>
 </div>`;
@@ -224,7 +224,7 @@ function cardHTML(plan,lo){
     <div style="height:72px;padding-top:8px;text-align:center"><span style="font-weight:400;font-size:14px;line-height:24px;color:#505050">${plan.tagline}</span></div>
   </div>
 </div>
-<div style="display:flex;flex-direction:column;gap:56px">
+<div style="display:flex;flex-direction:column;gap:32px">
   ${showElec?`<div style="border-radius:24px;background:#F6F6F6;padding:32px;display:flex;flex-direction:column;gap:16px">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <span style="font-weight:500;font-size:16px;line-height:24px;color:#232323">Electricity</span>
@@ -267,7 +267,7 @@ function cardHTML(plan,lo){
       </div>
     </div>
   </div>
-  <div style="padding:0 12px;display:flex;flex-direction:column;gap:16px">
+  <div style="padding:0 12px;display:flex;flex-direction:column;gap:12px">
     <div style="display:flex;align-items:center;gap:12px">
       <div style="display:flex;flex-direction:column;gap:2px">
         <span style="font-weight:500;font-size:14px;line-height:20px;color:#232323">What's included with</span>
@@ -275,14 +275,14 @@ function cardHTML(plan,lo){
       </div>
       <div style="flex:1 1 16px;min-width:12px;height:1px;background:#D8D8D8"></div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:24px">${included.map(perkRow).join('')}</div>
+    <div style="display:flex;flex-direction:column;gap:14px">${included.map(perkRow).join('')}</div>
   </div>
   ${showAddons&&plan.addable&&plan.addable.length?`<div style="padding:0 12px;display:flex;flex-direction:column;gap:16px">
     <div style="display:flex;align-items:center;gap:12px">
       <span style="font-weight:500;font-size:14px;line-height:20px;color:#232323;white-space:nowrap">Things you can add</span>
       <div style="flex:1 1 16px;min-width:12px;height:1px;background:#D8D8D8"></div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:24px;min-height:168px">${plan.addable.map(perkRow).join('')}</div>
+    <div style="display:flex;flex-direction:column;gap:14px;min-height:110px">${plan.addable.map(perkRow).join('')}</div>
   </div>`:''}
 </div>
 <div style="padding:0 16px">
