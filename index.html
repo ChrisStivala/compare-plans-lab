@@ -1161,7 +1161,7 @@ function bindGlobalEvents(){
 
 /* ── Init ────────────────────────────────────────────────────── */
 /* ══ LAB toolbar + matrix editor ════════════════════════════════ */
-let _W=null,_sel=new Set(),_labKey=null; // working ranks + multi-cell selection
+let _W=null,_sel=new Set(),_labKey=null,_labUp=null; // working ranks + multi-cell selection
 function deriveRanks(arr){const r={};const n=arr.length;arr.forEach((id,i)=>r[id]=n-i);return r;}
 function ranksToOrder(ranks){return Object.keys(ranks).filter(id=>ranks[id]>0&&CATALOG[id])
   .sort((a,b)=>(ranks[b]-ranks[a])||(CATALOG_ORDER.indexOf(a)-CATALOG_ORDER.indexOf(b)));}
@@ -1217,7 +1217,7 @@ function renderLabBar(){
   });
 }
 function openEditor(){_W={};_sel.clear();STATES.forEach(s=>{_W[s.id]=deriveRanks(S.matrix[s.id]||[]);});document.getElementById('lab-layer').style.display='block';renderEditor();}
-function closeEditor(){const l=document.getElementById('lab-layer');l.style.display='none';l.innerHTML='';if(_labKey){document.removeEventListener('keydown',_labKey);_labKey=null;}}
+function closeEditor(){const l=document.getElementById('lab-layer');l.style.display='none';l.innerHTML='';if(_labKey){document.removeEventListener('keydown',_labKey);_labKey=null;}if(_labUp){document.removeEventListener('mouseup',_labUp);_labUp=null;}}
 function renderEditor(){
   const layer=document.getElementById('lab-layer');
   const head=`<th style="position:sticky;left:0;background:#fff;text-align:left;padding:8px 10px;font-size:12px;color:#505050;min-width:190px;z-index:1">Plan</th>`+
@@ -1225,8 +1225,8 @@ function renderEditor(){
   const rows=CATALOG_ORDER.map(id=>{
     const p=CATALOG[id];if(!p)return'';
     const cells=STATES.map(s=>{const cur=(_W[s.id]&&_W[s.id][id])||0;
-      return `<td style="text-align:center;padding:5px 5px"><input type="text" inputmode="numeric" maxlength="2" data-rk-plan="${id}" data-rk-state="${s.id}" value="${cur>0?cur:''}" placeholder="—" style="width:46px;text-align:center;font-family:gordita;font-size:13px;border:1px solid #E0E0E0;border-radius:7px;padding:6px 4px;outline:none"></td>`;}).join('');
-    return `<tr style="border-top:1px solid #EEE"><td style="position:sticky;left:0;background:#fff;padding:8px 10px;font-size:13px;color:#232323;z-index:1"><strong>${p.name.replace('Origin ','')}</strong> <span style="color:#909090">(${p.discount}%)</span></td>${cells}</tr>`;
+      return `<td style="text-align:center;padding:5px 5px"><input type="text" inputmode="numeric" maxlength="2" readonly data-rk-plan="${id}" data-rk-state="${s.id}" value="${cur>0?cur:''}" placeholder="—" style="width:46px;text-align:center;font-family:gordita;font-size:13px;border:1px solid #E0E0E0;border-radius:7px;padding:6px 4px;outline:none;cursor:cell;background:#fff"></td>`;}).join('');
+    return `<tr style="border-top:1px solid #EEE"><td data-row="${id}" title="Click to select the whole row" style="position:sticky;left:0;background:#fff;padding:8px 10px;font-size:13px;color:#232323;z-index:1;cursor:pointer;user-select:none"><strong>${p.name.replace('Origin ','')}</strong> <span style="color:#909090">(${p.discount}%)</span></td>${cells}</tr>`;
   }).join('');
   layer.innerHTML=`<div id="lab-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px">
     <div style="background:#fff;border-radius:16px;width:100%;max-width:1040px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.3);font-family:gordita,sans-serif">
@@ -1235,17 +1235,10 @@ function renderEditor(){
         <button id="lab-close" style="border:0;background:#F2F2F2;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:18px;color:#505050">×</button>
       </div>
       <div style="padding:16px 22px 0">
-        <p style="font-size:13px;color:#505050;margin:0 0 10px">Type a rank per state (whole numbers). <strong>Higher number = appears first</strong>; <strong>blank</strong> = hidden. Ranks are unique per state; gaps close on save (1, 3, 7 → 1, 2, 3). <strong>Ctrl/⌘-click</strong> cells (or click a column header) to multi-select, then bulk set or clear.</p>
+        <p style="font-size:13px;color:#505050;margin:0 0 10px"><strong>Higher number = appears first</strong>; <strong>blank</strong> = hidden. Ranks are unique per state; gaps close on save (1, 3, 7 → 1, 2, 3).<br>Works like a spreadsheet: <strong>click or drag</strong> to select cells (Shift extends, ⌘-click adds, click a row/column header to select it). <strong>Type a number</strong> to fill, <strong>Delete</strong> to clear, <strong>double-click</strong> a cell to edit it, <strong>Esc</strong> to deselect.</p>
         <div id="lab-err" style="display:none;background:#FFE9F2;color:#B0006B;border:1px solid #F5B5D3;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;margin:0 0 12px"></div>
-        <div id="lab-bulk" style="display:none;align-items:center;gap:10px;background:#EAF1FF;border:1px solid #B9D2FF;border-radius:10px;padding:9px 12px;margin:0 0 12px">
-          <span id="lab-bulk-n" style="font-size:13px;font-weight:700;color:#2D5FB0"></span>
-          <input id="lab-bulk-val" type="text" inputmode="numeric" maxlength="2" placeholder="rank" style="width:64px;text-align:center;font-family:gordita;font-size:13px;border:1px solid #B9D2FF;border-radius:7px;padding:7px 6px;outline:none">
-          <button id="lab-bulk-apply" style="font-family:gordita;font-weight:600;font-size:13px;border:0;background:#2D7FF9;color:#fff;border-radius:8px;padding:8px 14px;cursor:pointer">Set</button>
-          <button id="lab-bulk-clear" style="font-family:gordita;font-weight:600;font-size:13px;border:1px solid #B9D2FF;background:#fff;color:#2D5FB0;border-radius:8px;padding:8px 12px;cursor:pointer">Clear</button>
-          <button id="lab-bulk-deselect" style="font-family:gordita;font-weight:600;font-size:13px;border:0;background:transparent;color:#2D5FB0;border-radius:8px;padding:8px 8px;cursor:pointer">Deselect</button>
-        </div>
       </div>
-      <div style="padding:0 22px 18px;overflow:auto"><div style="overflow:auto;border:1px solid #EEE;border-radius:10px;max-height:54vh"><table style="border-collapse:collapse;width:100%"><thead><tr style="background:#fff;position:sticky;top:0;z-index:2">${head}</tr></thead><tbody>${rows}</tbody></table></div></div>
+      <div style="padding:0 22px 18px;overflow:auto"><div style="overflow:auto;border:1px solid #EEE;border-radius:10px;max-height:56vh"><table style="border-collapse:collapse;width:100%"><thead><tr style="background:#fff;position:sticky;top:0;z-index:2">${head}</tr></thead><tbody>${rows}</tbody></table></div></div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 22px;border-top:1px solid #EEE">
         <button id="lab-reset-editor" style="font-family:gordita;font-weight:600;font-size:13px;border:1px solid #D8D8D8;background:#fff;border-radius:8px;padding:10px 14px;cursor:pointer;color:#505050">Reset to defaults</button>
         <div style="display:flex;gap:10px">
@@ -1258,8 +1251,11 @@ function renderEditor(){
   layer.querySelector('#lab-cancel').onclick=closeEditor;
   layer.querySelector('#lab-backdrop').addEventListener('mousedown',e=>{if(e.target.id==='lab-backdrop')closeEditor();});
   layer.querySelector('#lab-reset-editor').onclick=()=>{if(confirm('Reset to default matrix?')){_W={};_sel.clear();STATES.forEach(s=>{_W[s.id]=deriveRanks(DEFAULT_MATRIX[s.id]||[]);});renderEditor();}};
+  layer.addEventListener('contextmenu',e=>e.preventDefault()); // no native menu on ⌃-click (mac)
   const inputs=[...layer.querySelectorAll('[data-rk-plan]')];
   const byKey={};inputs.forEach(i=>byKey[i.dataset.rkState+'|'+i.dataset.rkPlan]=i);
+  const rIdx=pl=>CATALOG_ORDER.indexOf(pl),cIdx=st=>STATES.findIndex(s=>s.id===st);
+  let anchor=null,dragging=false,typeBuf='',typeTime=0;
   function validate(){
     const bad=[],errKeys=new Set();
     STATES.forEach(s=>{
@@ -1277,35 +1273,40 @@ function renderEditor(){
     if(bad.length){err.style.display='block';err.textContent='Duplicate ranks in: '+bad.join(', ')+' — each rank must be unique within a state.';save.disabled=true;save.style.opacity='.45';save.style.cursor='not-allowed';}
     else{err.style.display='none';save.disabled=false;save.style.opacity='1';save.style.cursor='pointer';}
   }
-  function updateSelUI(){
-    inputs.forEach(i=>{i.style.boxShadow=_sel.has(i.dataset.rkState+'|'+i.dataset.rkPlan)?'0 0 0 2px #2D7FF9':'none';});
-    const bar=layer.querySelector('#lab-bulk');
-    if(_sel.size){bar.style.display='flex';layer.querySelector('#lab-bulk-n').textContent=_sel.size+' cell'+(_sel.size>1?'s':'')+' selected';}
-    else bar.style.display='none';
+  function updateSelUI(){inputs.forEach(i=>{i.style.boxShadow=_sel.has(i.dataset.rkState+'|'+i.dataset.rkPlan)?'0 0 0 2px #2D7FF9':'none';});}
+  function setRange(aPl,aSt,bPl,bSt,additive){
+    if(!additive)_sel.clear();
+    const r0=Math.min(rIdx(aPl),rIdx(bPl)),r1=Math.max(rIdx(aPl),rIdx(bPl)),c0=Math.min(cIdx(aSt),cIdx(bSt)),c1=Math.max(cIdx(aSt),cIdx(bSt));
+    for(let r=r0;r<=r1;r++){const pid=CATALOG_ORDER[r];if(!CATALOG[pid])continue;for(let c=c0;c<=c1;c++)_sel.add(STATES[c].id+'|'+pid);}
+    updateSelUI();
   }
   function bulkSet(num){
     _sel.forEach(k=>{const i=k.indexOf('|'),st=k.slice(0,i),id=k.slice(i+1);_W[st]=_W[st]||{};_W[st][id]=num;const el=byKey[k];if(el)el.value=num>0?num:'';});
-    validate();updateSelUI();
+    validate();
   }
   inputs.forEach(inp=>{
     inp.addEventListener('mousedown',e=>{
-      if(e.ctrlKey||e.metaKey){e.preventDefault();const k=inp.dataset.rkState+'|'+inp.dataset.rkPlan;if(_sel.has(k))_sel.delete(k);else _sel.add(k);updateSelUI();}
-      else if(_sel.size){_sel.clear();updateSelUI();}
+      const pl=inp.dataset.rkPlan,st=inp.dataset.rkState;
+      const ed=document.activeElement;if(ed&&ed!==inp&&ed.dataset&&ed.dataset.rkPlan)ed.blur();
+      e.preventDefault();typeBuf='';
+      if(e.shiftKey&&anchor){setRange(anchor.pl,anchor.st,pl,st,false);}
+      else if(e.metaKey||e.ctrlKey){const k=st+'|'+pl;if(_sel.has(k))_sel.delete(k);else _sel.add(k);anchor={pl,st};updateSelUI();}
+      else{anchor={pl,st};setRange(pl,st,pl,st,false);dragging=true;}
     });
+    inp.addEventListener('mouseover',e=>{if(dragging&&e.buttons===1&&anchor)setRange(anchor.pl,anchor.st,inp.dataset.rkPlan,inp.dataset.rkState,false);});
+    inp.addEventListener('dblclick',e=>{e.stopPropagation();inp.readOnly=false;inp.focus();inp.select();});
+    inp.addEventListener('blur',()=>{inp.readOnly=true;});
     inp.addEventListener('input',()=>{
       inp.value=inp.value.replace(/\D/g,'').slice(0,2);
       const st=inp.dataset.rkState,id=inp.dataset.rkPlan;_W[st]=_W[st]||{};_W[st][id]=inp.value===''?0:parseInt(inp.value,10);
       validate();
     });
   });
-  layer.querySelectorAll('[data-col]').forEach(th=>th.addEventListener('click',()=>{
-    const st=th.dataset.col,keys=CATALOG_ORDER.filter(id=>CATALOG[id]).map(id=>st+'|'+id);
-    const allSel=keys.every(k=>_sel.has(k));keys.forEach(k=>{if(allSel)_sel.delete(k);else _sel.add(k);});updateSelUI();
-  }));
-  layer.querySelector('#lab-bulk-apply').onclick=()=>{const raw=(layer.querySelector('#lab-bulk-val').value||'').replace(/\D/g,'');bulkSet(raw===''?0:parseInt(raw,10));};
-  layer.querySelector('#lab-bulk-val').addEventListener('keydown',e=>{if(e.key==='Enter')layer.querySelector('#lab-bulk-apply').click();});
-  layer.querySelector('#lab-bulk-clear').onclick=()=>bulkSet(0);
-  layer.querySelector('#lab-bulk-deselect').onclick=()=>{_sel.clear();updateSelUI();};
+  layer.querySelectorAll('[data-col]').forEach(th=>th.addEventListener('mousedown',e=>{e.preventDefault();
+    const st=th.dataset.col,first=CATALOG_ORDER.find(id=>CATALOG[id]),last=[...CATALOG_ORDER].reverse().find(id=>CATALOG[id]);
+    setRange(first,st,last,st,false);anchor={pl:first,st};}));
+  layer.querySelectorAll('[data-row]').forEach(td=>td.addEventListener('mousedown',e=>{e.preventDefault();
+    const pl=td.dataset.row;setRange(pl,STATES[0].id,pl,STATES[STATES.length-1].id,false);anchor={pl,st:STATES[0].id};}));
   layer.querySelector('#lab-save').onclick=()=>{
     const save=layer.querySelector('#lab-save');if(save.disabled)return;
     const prev=activePlans().map(p=>p.id);
@@ -1315,13 +1316,19 @@ function renderEditor(){
     labToast('Saved — previewing “'+((STATES.find(s=>s.id===S.matrixState)||{}).label||'')+'”');
   };
   if(_labKey)document.removeEventListener('keydown',_labKey);
+  if(_labUp)document.removeEventListener('mouseup',_labUp);
+  _labUp=function(){dragging=false;};
   _labKey=function(e){
     if(layer.style.display==='none')return;
-    const ae=document.activeElement,inField=ae&&ae.tagName==='INPUT';
-    if(e.key==='Escape'){if(_sel.size){_sel.clear();updateSelUI();}else closeEditor();}
-    else if((e.key==='Delete'||e.key==='Backspace')&&_sel.size&&!inField){e.preventDefault();bulkSet(0);}
+    const ae=document.activeElement,editingCell=ae&&ae.dataset&&ae.dataset.rkPlan&&!ae.readOnly;
+    if(editingCell)return; // a cell is open for direct editing — let it type
+    if(e.key==='Escape'){if(_sel.size){_sel.clear();updateSelUI();}else closeEditor();return;}
+    if(!_sel.size)return;
+    if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();typeBuf='';bulkSet(0);}
+    else if(/^[0-9]$/.test(e.key)){e.preventDefault();const now=performance.now();if(now-typeTime>900)typeBuf='';typeTime=now;typeBuf=(typeBuf+e.key).slice(-2);bulkSet(parseInt(typeBuf,10));}
   };
   document.addEventListener('keydown',_labKey);
+  document.addEventListener('mouseup',_labUp);
   validate();updateSelUI();
 }
 function labInit(){
