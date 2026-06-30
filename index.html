@@ -27,6 +27,7 @@ button{font-family:inherit}
 @keyframes cpSlideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 @keyframes cpSlideDown{from{transform:translateY(0)}to{transform:translateY(100%)}}
 @keyframes cpCardIn{0%{opacity:0;transform:translateY(32px);margin-left:calc(-1 * var(--cw,308px))}55%{opacity:1}100%{opacity:1;transform:translateY(0);margin-left:0}}
+@keyframes cpCardEnter{0%{opacity:0;transform:translateY(26px) scale(.97)}100%{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes cpCardOut{0%{opacity:1;transform:translateY(0);margin-left:0}35%{opacity:0}100%{opacity:0;transform:translateY(28px);margin-left:calc(-1 * var(--cw,308px))}}
 @keyframes cpModalIn{from{opacity:0;transform:translateY(24px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes cpModalOut{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(16px) scale(.98)}}
@@ -178,16 +179,16 @@ const STATES=[
   {id:'solarEvBattery',label:'Solar + EV + Battery',short:'S+EV+B'}
 ];
 const DEFAULT_MATRIX={
-  default:['go','edr','basic'],
+  default:['go','edr','wd'],
   smart:['go','edr','wd'],
   basicMeter:['go','edr','basic'],
-  solar:['go','edr','solar'],
-  ev:['go','edr','night'],
-  battery:['go','batteryStarter','battery'],
-  solarEv:['go','solar','night'],
-  evBattery:['go','night','batteryStarter','battery'],
-  solarBattery:['go','solar','batteryStarter','battery'],
-  solarEvBattery:['go','night','batteryStarter','battery']
+  solar:['go','edr','solar','wd'],
+  ev:['go','edr','wd','night'],
+  battery:['go','edr','wd','battery'],
+  solarEv:['go','edr','solar','wd','night'],
+  evBattery:['go','edr','wd','night','battery'],
+  solarBattery:['go','edr','solar','wd','battery'],
+  solarEvBattery:['go','edr','solar','wd','night','battery']
 };
 // Maps the Solar/EV/Battery filter combination to a matrix state, and back.
 const STATE_ADDONS={
@@ -201,11 +202,17 @@ function addonsToState(a){
   return {'':null,'S':'solar','E':'ev','B':'battery','SE':'solarEv','EB':'evBattery','SB':'solarBattery','SEB':'solarEvBattery'}[k];
 }
 function labClone(o){return JSON.parse(JSON.stringify(o));}
+function normMatrix(m){const out={};STATES.forEach(st=>{out[st.id]=Array.isArray(m&&m[st.id])?m[st.id].filter(id=>CATALOG[id]):[];});return out;}
+function encodeMatrix(m){try{return btoa(JSON.stringify(m));}catch(e){return'';}}
+function decodeMatrix(s){try{return JSON.parse(atob(decodeURIComponent(s)));}catch(e){return null;}}
 function loadMatrix(){
-  try{const s=localStorage.getItem('cp_lab_matrix');if(s){const m=JSON.parse(s);
-    STATES.forEach(st=>{if(!Array.isArray(m[st.id]))m[st.id]=[];});return m;}}catch(e){}
+  // 1) URL query string (shared variation) wins, 2) localStorage, 3) defaults
+  try{const u=new URLSearchParams(location.search).get('m');if(u){const m=decodeMatrix(u);if(m)return normMatrix(m);}}catch(e){}
+  try{const s=localStorage.getItem('cp_lab_matrix');if(s)return normMatrix(JSON.parse(s));}catch(e){}
   return labClone(DEFAULT_MATRIX);
 }
+function loadState(){try{const s=new URLSearchParams(location.search).get('s');if(s&&STATES.some(x=>x.id===s))return s;}catch(e){}return 'default';}
+function updateURL(){try{const p=new URLSearchParams(location.search);p.set('m',encodeMatrix(S.matrix));p.set('s',S.matrixState);history.replaceState(null,'',location.pathname+'?'+p.toString());}catch(e){}}
 
 /* ── State ──────────────────────────────────────────────────── */
 const S={
@@ -217,7 +224,7 @@ const S={
   car:{left:0,max:0,idx:0,n:0,cw:0,sw:0},
   vw:window.innerWidth,
   entering:{},exiting:{},gasInstant:false,
-  matrix:loadMatrix(),matrixState:'default'
+  matrix:loadMatrix(),matrixState:loadState(),_entrance:false
 };
 
 /* ── Layout ─────────────────────────────────────────────────── */
@@ -250,7 +257,7 @@ function perkRow(pk,rowH){
 </div>`;
 }
 
-function cardHTML(plan,lo){
+function cardHTML(plan,lo,idx){
   const{fuel,ratesOpen,gasRatesOpen,exiting,entering,gasInstant}=S;
   const showElec=fuel!=='Gas',showGas=fuel!=='Electricity';
   const{isWide,cgap,cw}=lo;
@@ -262,6 +269,7 @@ function cardHTML(plan,lo){
   const cWidth=isWide?(cw+'px'):'300px';
   const slotPx=isWide?(cw+cgap):308;
   const anim=(exiting&&exiting[plan.id])?'cpCardOut .34s cubic-bezier(.16,.84,.44,1) both'
+    :S._entrance?`cpCardEnter .5s cubic-bezier(.22,.61,.36,1) ${Math.min(idx||0,8)*80}ms both`
     :(entering&&entering[plan.id])?'cpCardIn .58s cubic-bezier(.34,1.28,.5,1) both':'none';
 
   const gTrans=gasInstant?'none':'grid-template-rows .44s cubic-bezier(.4,0,.2,1),margin-top .44s cubic-bezier(.4,0,.2,1),opacity .3s ease';
@@ -683,7 +691,7 @@ function updateCarousel(){
   const mask=lo.isWide?`linear-gradient(to right, transparent 0, #000 ${_m}px, #000 calc(100% - ${_m}px), transparent 100%)`:'none';
   const snap=lo.isWide?'x proximity':'x mandatory';
   _car.style.cssText=`display:flex;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:${snap};outline:none;cursor:${lo.isWide?'grab':'auto'};gap:${cgap};padding:${pad};scroll-padding-left:${scrollPad};-webkit-mask-image:${mask};mask-image:${mask}`;
-  _car.innerHTML=plans.map(p=>cardHTML(p,lo)).join('');
+  _car.innerHTML=plans.map((p,i)=>cardHTML(p,lo,i)).join('');
   _car.scrollLeft=saved;
   updateCounts();
   updateArrows();
@@ -1154,7 +1162,10 @@ function bindGlobalEvents(){
 
 /* ── Init ────────────────────────────────────────────────────── */
 /* ══ LAB toolbar + matrix editor ════════════════════════════════ */
-let _W=null,_tab='incl',_rankState='default';
+let _W=null; // working ranks: { stateId: { planId: rank } } (0 = hidden)
+function deriveRanks(arr){const r={};const n=arr.length;arr.forEach((id,i)=>r[id]=n-i);return r;}
+function ranksToOrder(ranks){return Object.keys(ranks).filter(id=>ranks[id]>0&&CATALOG[id])
+  .sort((a,b)=>(ranks[b]-ranks[a])||(CATALOG_ORDER.indexOf(a)-CATALOG_ORDER.indexOf(b)));}
 function saveMatrix(){try{localStorage.setItem('cp_lab_matrix',JSON.stringify(S.matrix));}catch(e){}}
 function labToast(msg){
   let t=document.getElementById('lab-toast');
@@ -1169,8 +1180,9 @@ function setMatrixState(id){
   S.addons={Solar:false,EV:false,Battery:false,...(STATE_ADDONS[id]||{})};
   const sel=document.getElementById('lab-state');if(sel&&sel.value!==id)sel.value=id;
   updateAddonFilters();
-  updateCarousel();
   if(_car)_car.scrollLeft=0;
+  S._entrance=true;updateCarousel();S._entrance=false;
+  updateURL();
 }
 function renderLabBar(){
   const bar=document.getElementById('lab-bar');
@@ -1179,54 +1191,44 @@ function renderLabBar(){
   <span style="font-weight:500;font-size:13px;color:#cfcfcf">State</span>
   <select id="lab-state" style="font-family:gordita;font-weight:600;font-size:13px;border:0;border-radius:8px;padding:8px 10px;background:#fff;color:#232323;cursor:pointer;max-width:200px">${opts}</select>
   <button id="lab-edit" style="font-family:gordita;font-weight:600;font-size:13px;border:0;border-radius:8px;padding:9px 14px;background:#FFB233;color:#232323;cursor:pointer">Edit matrix</button>
+  <button id="lab-copy" title="Copy a shareable link to this matrix" style="font-family:gordita;font-weight:600;font-size:13px;border:1px solid #555;border-radius:8px;padding:9px 12px;background:transparent;color:#fff;cursor:pointer">Copy link</button>
   <button id="lab-reset" title="Reset matrix to defaults" style="font-family:gordita;font-weight:600;font-size:13px;border:1px solid #555;border-radius:8px;padding:9px 12px;background:transparent;color:#fff;cursor:pointer">Reset</button>`;
   document.getElementById('lab-state').addEventListener('change',e=>setMatrixState(e.target.value));
   document.getElementById('lab-edit').addEventListener('click',openEditor);
+  document.getElementById('lab-copy').addEventListener('click',()=>{
+    updateURL();const url=location.href;
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(()=>labToast('Share link copied')).catch(()=>labToast('Copy failed — link in address bar'));}
+    else labToast('Link is in the address bar');
+  });
   document.getElementById('lab-reset').addEventListener('click',()=>{
     if(!confirm('Reset the display matrix to defaults? This clears your saved changes.'))return;
-    S.matrix=labClone(DEFAULT_MATRIX);saveMatrix();updateCarousel();labToast('Matrix reset to defaults');
+    S.matrix=labClone(DEFAULT_MATRIX);saveMatrix();updateURL();
+    S._entrance=true;updateCarousel();S._entrance=false;labToast('Matrix reset to defaults');
   });
 }
-function openEditor(){_W=labClone(S.matrix);_tab='incl';_rankState=S.matrixState;document.getElementById('lab-layer').style.display='block';renderEditor();}
-function closeEditor(){document.getElementById('lab-layer').style.display='none';document.getElementById('lab-layer').innerHTML='';}
+function openEditor(){_W={};STATES.forEach(s=>{_W[s.id]=deriveRanks(S.matrix[s.id]||[]);});document.getElementById('lab-layer').style.display='block';renderEditor();}
+function closeEditor(){const l=document.getElementById('lab-layer');l.style.display='none';l.innerHTML='';}
 function renderEditor(){
   const layer=document.getElementById('lab-layer');
-  const tabBtn=(id,label)=>`<button data-tab="${id}" style="font-family:gordita;font-weight:600;font-size:13px;border:0;border-bottom:2px solid ${_tab===id?'#232323':'transparent'};background:transparent;color:${_tab===id?'#232323':'#909090'};padding:10px 14px;cursor:pointer">${label}</button>`;
-  let body='';
-  if(_tab==='incl'){
-    const head=`<th style="position:sticky;left:0;background:#fff;text-align:left;padding:8px 10px;font-size:12px;color:#505050;min-width:200px;z-index:1">Plan</th>`+
-      STATES.map(s=>`<th style="padding:8px 6px;font-size:11px;color:#505050;font-weight:600;white-space:nowrap" title="${s.label}">${s.short}</th>`).join('');
-    const rows=CATALOG_ORDER.map(id=>{
-      const p=CATALOG[id];if(!p)return'';
-      const cells=STATES.map(s=>{const on=(_W[s.id]||[]).includes(id);
-        return `<td style="text-align:center;padding:6px 6px"><input type="checkbox" data-incl-plan="${id}" data-incl-state="${s.id}"${on?' checked':''} style="width:18px;height:18px;cursor:pointer;accent-color:#FF6024"></td>`;}).join('');
-      return `<tr style="border-top:1px solid #EEE"><td style="position:sticky;left:0;background:#fff;padding:8px 10px;font-size:13px;color:#232323;z-index:1"><strong>${p.name.replace('Origin ','')}</strong> <span style="color:#909090">(${p.discount}%)</span></td>${cells}</tr>`;
-    }).join('');
-    body=`<p style="font-size:13px;color:#505050;margin:0 0 10px">Tick which plans appear in each state. Use the <strong>Ranking</strong> tab to set their order.</p>
-    <div style="overflow:auto;border:1px solid #EEE;border-radius:10px;max-height:52vh"><table style="border-collapse:collapse;width:100%"><thead><tr style="background:#fff;position:sticky;top:0;z-index:2">${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
-  } else {
-    const stOpts=STATES.map(s=>`<option value="${s.id}"${s.id===_rankState?' selected':''}>${s.label}</option>`).join('');
-    const list=(_W[_rankState]||[]);
-    const items=list.length?list.map((id,i)=>{const p=CATALOG[id];
-      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #EEE;border-radius:10px;margin-bottom:8px;background:#fff">
-        <span style="width:26px;height:26px;border-radius:50%;background:#232323;color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center">${i+1}</span>
-        <span style="flex:1;font-size:14px;color:#232323"><strong>${p?p.name:id}</strong> <span style="color:#909090">(${p?p.discount:'?'}%)</span></span>
-        <button data-rank-up="${i}" ${i===0?'disabled':''} style="border:1px solid #D8D8D8;background:#fff;border-radius:6px;width:30px;height:30px;cursor:pointer;font-size:14px;opacity:${i===0?.4:1}">▲</button>
-        <button data-rank-down="${i}" ${i===list.length-1?'disabled':''} style="border:1px solid #D8D8D8;background:#fff;border-radius:6px;width:30px;height:30px;cursor:pointer;font-size:14px;opacity:${i===list.length-1?.4:1}">▼</button>
-        <button data-rank-remove="${i}" title="Remove" style="border:1px solid #F0C0C0;background:#fff;color:#D44;border-radius:6px;width:30px;height:30px;cursor:pointer;font-size:16px">×</button>
-      </div>`;}).join(''):`<p style="color:#909090;font-size:13px">No plans in this state yet — add some on the Inclusion tab.</p>`;
-    body=`<div style="display:flex;align-items:center;gap:10px;margin:0 0 12px"><span style="font-size:13px;color:#505050">Order for state:</span>
-      <select id="rank-state" style="font-family:gordita;font-weight:600;font-size:13px;border:1px solid #D8D8D8;border-radius:8px;padding:8px 10px;cursor:pointer">${stOpts}</select></div>
-      <p style="font-size:13px;color:#505050;margin:0 0 10px">Top of the list = leftmost card (rank 1).</p>${items}`;
-  }
+  const MAXR=CATALOG_ORDER.length;
+  const head=`<th style="position:sticky;left:0;background:#fff;text-align:left;padding:8px 10px;font-size:12px;color:#505050;min-width:190px;z-index:1">Plan</th>`+
+    STATES.map(s=>`<th style="padding:8px 6px;font-size:11px;color:#505050;font-weight:600;white-space:nowrap" title="${s.label}">${s.short}</th>`).join('');
+  const rows=CATALOG_ORDER.map(id=>{
+    const p=CATALOG[id];if(!p)return'';
+    const cells=STATES.map(s=>{const cur=(_W[s.id]&&_W[s.id][id])||0,on=cur>0;
+      let opts='';for(let n=0;n<=MAXR;n++)opts+=`<option value="${n}"${n===cur?' selected':''}>${n===0?'—':n}</option>`;
+      const st=on?'background:#FFF1E8;border-color:#FF6024;color:#C2410C;font-weight:700':'background:#fff;border-color:#E0E0E0;color:#B0B0B0';
+      return `<td style="text-align:center;padding:5px 5px"><select data-rk-plan="${id}" data-rk-state="${s.id}" style="font-family:gordita;font-size:13px;border:1px solid #E0E0E0;border-radius:7px;padding:5px 4px;cursor:pointer;${st}">${opts}</select></td>`;}).join('');
+    return `<tr style="border-top:1px solid #EEE"><td style="position:sticky;left:0;background:#fff;padding:8px 10px;font-size:13px;color:#232323;z-index:1"><strong>${p.name.replace('Origin ','')}</strong> <span style="color:#909090">(${p.discount}%)</span></td>${cells}</tr>`;
+  }).join('');
   layer.innerHTML=`<div id="lab-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px">
-    <div style="background:#fff;border-radius:16px;width:100%;max-width:980px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.3);font-family:gordita,sans-serif">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:1040px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.3);font-family:gordita,sans-serif">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid #EEE">
         <span style="font-weight:700;font-size:18px;color:#232323">Plan display matrix</span>
         <button id="lab-close" style="border:0;background:#F2F2F2;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:18px;color:#505050">×</button>
       </div>
-      <div style="display:flex;gap:4px;padding:0 18px;border-bottom:1px solid #EEE">${tabBtn('incl','Inclusion')}${tabBtn('rank','Ranking')}</div>
-      <div style="padding:18px 22px;overflow:auto">${body}</div>
+      <div style="padding:16px 22px 0"><p style="font-size:13px;color:#505050;margin:0 0 12px">Set a rank per state. <strong>Higher number = appears first</strong> (and animates in first); <strong>—</strong> = hidden. Ties fall back to the list order below.</p></div>
+      <div style="padding:0 22px 18px;overflow:auto"><div style="overflow:auto;border:1px solid #EEE;border-radius:10px;max-height:56vh"><table style="border-collapse:collapse;width:100%"><thead><tr style="background:#fff;position:sticky;top:0;z-index:2">${head}</tr></thead><tbody>${rows}</tbody></table></div></div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 22px;border-top:1px solid #EEE">
         <button id="lab-reset-editor" style="font-family:gordita;font-weight:600;font-size:13px;border:1px solid #D8D8D8;background:#fff;border-radius:8px;padding:10px 14px;cursor:pointer;color:#505050">Reset to defaults</button>
         <div style="display:flex;gap:10px">
@@ -1235,27 +1237,21 @@ function renderEditor(){
         </div>
       </div>
     </div></div>`;
-  // wire
   layer.querySelector('#lab-close').onclick=closeEditor;
   layer.querySelector('#lab-cancel').onclick=closeEditor;
   layer.querySelector('#lab-backdrop').addEventListener('mousedown',e=>{if(e.target.id==='lab-backdrop')closeEditor();});
-  layer.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{_tab=b.dataset.tab;renderEditor();});
-  layer.querySelector('#lab-reset-editor').onclick=()=>{if(confirm('Reset to default matrix?')){_W=labClone(DEFAULT_MATRIX);renderEditor();}};
-  layer.querySelector('#lab-save').onclick=()=>{S.matrix=_W;saveMatrix();closeEditor();
-    if(!S.matrix[S.matrixState]||!S.matrix[S.matrixState].length){/* keep state */}
-    updateCarousel();if(_car)_car.scrollLeft=0;labToast('Saved — previewing “'+(STATES.find(s=>s.id===S.matrixState)||{}).label+'”');};
-  if(_tab==='incl'){
-    layer.querySelectorAll('[data-incl-plan]').forEach(cb=>cb.addEventListener('change',()=>{
-      const id=cb.dataset.inclPlan,st=cb.dataset.inclState;_W[st]=_W[st]||[];
-      const idx=_W[st].indexOf(id);
-      if(cb.checked&&idx<0)_W[st].push(id); else if(!cb.checked&&idx>=0)_W[st].splice(idx,1);
-    }));
-  } else {
-    layer.querySelector('#rank-state').addEventListener('change',e=>{_rankState=e.target.value;renderEditor();});
-    layer.querySelectorAll('[data-rank-up]').forEach(b=>b.onclick=()=>{const i=+b.dataset.rankUp;const a=_W[_rankState];[a[i-1],a[i]]=[a[i],a[i-1]];renderEditor();});
-    layer.querySelectorAll('[data-rank-down]').forEach(b=>b.onclick=()=>{const i=+b.dataset.rankDown;const a=_W[_rankState];[a[i+1],a[i]]=[a[i],a[i+1]];renderEditor();});
-    layer.querySelectorAll('[data-rank-remove]').forEach(b=>b.onclick=()=>{const i=+b.dataset.rankRemove;_W[_rankState].splice(i,1);renderEditor();});
-  }
+  layer.querySelector('#lab-reset-editor').onclick=()=>{if(confirm('Reset to default matrix?')){_W={};STATES.forEach(s=>{_W[s.id]=deriveRanks(DEFAULT_MATRIX[s.id]||[]);});renderEditor();}};
+  layer.querySelector('#lab-save').onclick=()=>{
+    const m={};STATES.forEach(s=>{m[s.id]=ranksToOrder(_W[s.id]||{});});
+    S.matrix=m;saveMatrix();updateURL();closeEditor();
+    if(_car)_car.scrollLeft=0;S._entrance=true;updateCarousel();S._entrance=false;
+    labToast('Saved — previewing “'+((STATES.find(s=>s.id===S.matrixState)||{}).label||'')+'”');
+  };
+  layer.querySelectorAll('[data-rk-plan]').forEach(sel=>sel.addEventListener('change',()=>{
+    const id=sel.dataset.rkPlan,st=sel.dataset.rkState,v=+sel.value;
+    _W[st]=_W[st]||{};_W[st][id]=v;const on=v>0;
+    sel.style.background=on?'#FFF1E8':'#fff';sel.style.borderColor=on?'#FF6024':'#E0E0E0';sel.style.color=on?'#C2410C':'#B0B0B0';sel.style.fontWeight=on?'700':'400';
+  }));
 }
 function labInit(){
   let bar=document.getElementById('lab-bar');
@@ -1264,6 +1260,8 @@ function labInit(){
     document.body.appendChild(bar);}
   let layer=document.getElementById('lab-layer');
   if(!layer){layer=document.createElement('div');layer.id='lab-layer';layer.style.display='none';document.body.appendChild(layer);}
+  // sync filter checkboxes to the initial state (e.g. from a shared URL)
+  S.addons={Solar:false,EV:false,Battery:false,...(STATE_ADDONS[S.matrixState]||{})};
   renderLabBar();
 }
 
