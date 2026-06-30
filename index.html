@@ -1264,7 +1264,8 @@ function renderEditor(){
       if(dup)bad.push(s.short);
     });
     inputs.forEach(inp=>{const st=inp.dataset.rkState,id=inp.dataset.rkPlan,key=st+'|'+id,v=(_W[st]&&_W[st][id])||0,on=v>0,dup=errKeys.has(key),seld=_sel.has(key);
-      inp.style.background=seld?'#CFE2FF':(dup?'#FFE3EF':(on?'#FFF1E8':'transparent'));
+      // paint the cell (td) so the fill covers the full cell height even when a row wraps
+      if(inp.parentElement)inp.parentElement.style.background=seld?'#CFE2FF':(dup?'#FFE3EF':(on?'#FFF1E8':'transparent'));
       inp.style.color=dup?'#B0006B':(on?'#C2410C':'#B0B0B0');
       inp.style.fontWeight=(on||dup)?'700':'400';
     });
