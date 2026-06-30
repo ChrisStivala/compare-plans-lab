@@ -1220,13 +1220,13 @@ function openEditor(){_W={};_sel.clear();STATES.forEach(s=>{_W[s.id]=deriveRanks
 function closeEditor(){const l=document.getElementById('lab-layer');l.style.display='none';l.innerHTML='';if(_labKey){document.removeEventListener('keydown',_labKey);_labKey=null;}if(_labUp){document.removeEventListener('mouseup',_labUp);_labUp=null;}}
 function renderEditor(){
   const layer=document.getElementById('lab-layer');
-  const head=`<th style="position:sticky;left:0;background:#fff;text-align:left;padding:8px 10px;font-size:12px;color:#505050;min-width:190px;z-index:1">Plan</th>`+
-    STATES.map(s=>`<th data-col="${s.id}" title="Click to select the whole ${s.label} column" style="padding:8px 6px;font-size:11px;color:#505050;font-weight:600;white-space:nowrap;cursor:pointer;user-select:none">${s.short}</th>`).join('');
+  const head=`<th style="position:sticky;left:0;background:#fff;text-align:left;padding:8px 10px;font-size:12px;color:#505050;min-width:190px;z-index:1;border:1px solid #EAEAEA">Plan</th>`+
+    STATES.map(s=>`<th data-col="${s.id}" title="Click to select the whole ${s.label} column" style="padding:8px 6px;font-size:11px;color:#505050;font-weight:600;white-space:nowrap;cursor:pointer;user-select:none;border:1px solid #EAEAEA;background:#FAFAFA">${s.short}</th>`).join('');
   const rows=CATALOG_ORDER.map(id=>{
     const p=CATALOG[id];if(!p)return'';
     const cells=STATES.map(s=>{const cur=(_W[s.id]&&_W[s.id][id])||0;
-      return `<td style="text-align:center;padding:5px 5px"><input type="text" inputmode="numeric" maxlength="2" readonly data-rk-plan="${id}" data-rk-state="${s.id}" value="${cur>0?cur:''}" placeholder="—" style="width:46px;text-align:center;font-family:gordita;font-size:13px;border:1px solid #E0E0E0;border-radius:7px;padding:6px 4px;outline:none;cursor:cell;background:#fff"></td>`;}).join('');
-    return `<tr style="border-top:1px solid #EEE"><td data-row="${id}" title="Click to select the whole row" style="position:sticky;left:0;background:#fff;padding:8px 10px;font-size:13px;color:#232323;z-index:1;cursor:pointer;user-select:none"><strong>${p.name.replace('Origin ','')}</strong> <span style="color:#909090">(${p.discount}%)</span></td>${cells}</tr>`;
+      return `<td style="padding:0;border:1px solid #EAEAEA"><input type="text" inputmode="numeric" maxlength="2" readonly data-rk-plan="${id}" data-rk-state="${s.id}" value="${cur>0?cur:''}" placeholder="—" style="display:block;width:56px;height:38px;box-sizing:border-box;text-align:center;font-family:gordita;font-size:13px;border:0;border-radius:0;background:transparent;outline:none;cursor:cell;color:#B0B0B0"></td>`;}).join('');
+    return `<tr><td data-row="${id}" title="Click to select the whole row" style="position:sticky;left:0;background:#fff;padding:8px 10px;font-size:13px;color:#232323;z-index:1;cursor:pointer;user-select:none;border:1px solid #EAEAEA"><strong>${p.name.replace('Origin ','')}</strong> <span style="color:#909090">(${p.discount}%)</span></td>${cells}</tr>`;
   }).join('');
   layer.innerHTML=`<div id="lab-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px">
     <div style="background:#fff;border-radius:16px;width:100%;max-width:1040px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.3);font-family:gordita,sans-serif">
@@ -1263,17 +1263,16 @@ function renderEditor(){
       let dup=false;Object.keys(seen).forEach(v=>{if(seen[v].length>1){dup=true;seen[v].forEach(pid=>errKeys.add(s.id+'|'+pid));}});
       if(dup)bad.push(s.short);
     });
-    inputs.forEach(inp=>{const st=inp.dataset.rkState,id=inp.dataset.rkPlan,v=(_W[st]&&_W[st][id])||0,on=v>0,dup=errKeys.has(st+'|'+id);
-      inp.style.borderColor=dup?'#E5006D':(on?'#FF6024':'#E0E0E0');
-      inp.style.background=dup?'#FFE9F2':(on?'#FFF1E8':'#fff');
-      inp.style.color=dup?'#B0006B':(on?'#C2410C':'#909090');
+    inputs.forEach(inp=>{const st=inp.dataset.rkState,id=inp.dataset.rkPlan,key=st+'|'+id,v=(_W[st]&&_W[st][id])||0,on=v>0,dup=errKeys.has(key),seld=_sel.has(key);
+      inp.style.background=seld?'#CFE2FF':(dup?'#FFE3EF':(on?'#FFF1E8':'transparent'));
+      inp.style.color=dup?'#B0006B':(on?'#C2410C':'#B0B0B0');
       inp.style.fontWeight=(on||dup)?'700':'400';
     });
     const err=layer.querySelector('#lab-err'),save=layer.querySelector('#lab-save');
     if(bad.length){err.style.display='block';err.textContent='Duplicate ranks in: '+bad.join(', ')+' — each rank must be unique within a state.';save.disabled=true;save.style.opacity='.45';save.style.cursor='not-allowed';}
     else{err.style.display='none';save.disabled=false;save.style.opacity='1';save.style.cursor='pointer';}
   }
-  function updateSelUI(){inputs.forEach(i=>{i.style.boxShadow=_sel.has(i.dataset.rkState+'|'+i.dataset.rkPlan)?'0 0 0 2px #2D7FF9':'none';});}
+  function updateSelUI(){validate();}
   function setRange(aPl,aSt,bPl,bSt,additive){
     if(!additive)_sel.clear();
     const r0=Math.min(rIdx(aPl),rIdx(bPl)),r1=Math.max(rIdx(aPl),rIdx(bPl)),c0=Math.min(cIdx(aSt),cIdx(bSt)),c1=Math.max(cIdx(aSt),cIdx(bSt));
