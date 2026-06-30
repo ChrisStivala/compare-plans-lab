@@ -136,6 +136,66 @@ const MODALS={
 
 const SUGGESTIONS=['6 Nerli Street, Abbotsbury NSW 2176','6 Nerli Place, Abbotsbury NSW 2176','16 Nerli Street, Abbotsbury NSW 2176','26 Nerli Street, Prestons NSW 2170'];
 
+/* ══ LAB: Plan-matrix tester ════════════════════════════════════
+   Full product catalog keyed by id, the scenario "states", and the
+   default display matrix (which plans show, and in what order, per
+   state). Editable via the lab toolbar; persisted to localStorage. */
+const LAB_PLANS=[
+  {id:'weekend',name:'Origin Weekend Shift',tagline:'Off-peak electricity rates all weekend.',
+   discount:'16',ref:'$2,411',yearly:'$2,014',gasYearly:'$2,218',
+   includedTitle:"What’s included with Origin Weekend Shift.",
+   included:[{icon:'TOU',text:'Half price electricity Saturday and Sunday',modal:'weekday'},CAL],addable:[GP]},
+  {id:'basic',name:'Origin Basic',tagline:'For homes that want a no-frills ongoing energy plan.',
+   discount:'0',ref:'$2,411',yearly:'$2,411',gasYearly:'$2,218',
+   includedTitle:"What’s included with Origin Basic.",
+   included:[{icon:'Calendar',text:'Get our standing market rate contract',modal:'variable'},CAL],addable:[GP,EVP]},
+  {id:'batteryStarter',name:'Origin Battery Starter',tagline:'For homes who want a straightforward battery plan with no frills.',
+   discount:'0',ref:'$2,411',yearly:'$2,411',gasYearly:'$2,218',
+   includedTitle:"What’s included with Origin Battery Starter.",
+   included:[{icon:'Bolt',text:'Get a boosted FIT during peak times (18c/kWh)',modal:'battery'},CAL],addable:[GP,EVP]},
+  {id:'batteryMaximiser',name:'Origin Battery Maximiser',tagline:'Get bonus credits from joining the Origin Loop VPP.',
+   discount:'16',ref:'$2,411',yearly:'$2,030',gasYearly:'$2,218',
+   includedTitle:"What’s included with Origin Battery Maximiser.",
+   included:[{icon:'ChargeLine',text:'Automate your earnings with Origin Loop VPP',modal:'battery'},CAL],addable:[GP,EVP]}
+];
+const CATALOG={};
+BASE_PLANS.forEach(p=>CATALOG[p.id]=p);
+Object.values(ADDON_PLANS).forEach(p=>CATALOG[p.id]=p);
+LAB_PLANS.forEach(p=>CATALOG[p.id]=p);
+// Display order of plans in the editor (matches the source matrix sheet)
+const CATALOG_ORDER=['go','edr','basic','solar','wd','weekend','night','batteryStarter','batteryMaximiser','battery'];
+
+const STATES=[
+  {id:'default',label:'Default state',short:'Default'},
+  {id:'smart',label:'Grid only — smart meter',short:'Smart'},
+  {id:'basicMeter',label:'Grid only — basic meter',short:'Basic'},
+  {id:'solar',label:'Solar',short:'Solar'},
+  {id:'ev',label:'EV',short:'EV'},
+  {id:'battery',label:'Battery',short:'Battery'},
+  {id:'solarEv',label:'Solar + EV',short:'S+EV'},
+  {id:'evBattery',label:'EV + Battery',short:'EV+B'},
+  {id:'solarBattery',label:'Solar + Battery',short:'S+B'},
+  {id:'solarEvBattery',label:'Solar + EV + Battery',short:'S+EV+B'}
+];
+const DEFAULT_MATRIX={
+  default:['go','edr','basic'],
+  smart:['go','edr','wd'],
+  basicMeter:['go','edr','basic'],
+  solar:['go','edr','solar'],
+  ev:['go','edr','night'],
+  battery:['go','batteryStarter','battery'],
+  solarEv:['go','solar','night'],
+  evBattery:['go','night','batteryStarter','battery'],
+  solarBattery:['go','solar','batteryStarter','battery'],
+  solarEvBattery:['go','night','batteryStarter','battery']
+};
+function labClone(o){return JSON.parse(JSON.stringify(o));}
+function loadMatrix(){
+  try{const s=localStorage.getItem('cp_lab_matrix');if(s){const m=JSON.parse(s);
+    STATES.forEach(st=>{if(!Array.isArray(m[st.id]))m[st.id]=[];});return m;}}catch(e){}
+  return labClone(DEFAULT_MATRIX);
+}
+
 /* ── State ──────────────────────────────────────────────────── */
 const S={
   fuel:'Electricity',
@@ -145,7 +205,8 @@ const S={
   searchPhase:'idle',searchValue:'',
   car:{left:0,max:0,idx:0,n:0,cw:0,sw:0},
   vw:window.innerWidth,
-  entering:{},exiting:{},gasInstant:false
+  entering:{},exiting:{},gasInstant:false,
+  matrix:loadMatrix(),matrixState:'default'
 };
 
 /* ── Layout ─────────────────────────────────────────────────── */
@@ -161,14 +222,10 @@ function L(){
 
 /* ── Plan list ──────────────────────────────────────────────── */
 function activePlans(){
-  const{fuel,addons,exiting}=S;
-  let plans=BASE_PLANS.map(p=>({...p,included:[...p.included],addable:[...p.addable]}));
-  ['Solar','EV','Battery'].forEach(k=>{
-    const xid={Solar:'solar',EV:'night',Battery:'battery'}[k];
-    if(addons[k]||(exiting&&exiting[xid])) plans.unshift({...ADDON_PLANS[k],included:[...ADDON_PLANS[k].included],addable:[...ADDON_PLANS[k].addable]});
-  });
-  if(fuel==='Gas') plans=plans.filter(p=>p.id==='go'||p.id==='edr'||(exiting&&exiting[p.id]));
-  return plans;
+  // LAB: list is driven entirely by the editable display matrix + selected state.
+  const order=S.matrix[S.matrixState]||[];
+  return order.map(id=>CATALOG[id]).filter(Boolean)
+    .map(p=>({...p,included:[...p.included],addable:[...p.addable]}));
 }
 
 /* ── Card HTML ──────────────────────────────────────────────── */
@@ -560,7 +617,7 @@ function buildShell(){
         <button data-fuel="Gas" style="position:relative;z-index:1;${lo.isWide?'flex:0 0 auto;padding:0 24px':'flex:1'};border:0;background:transparent;cursor:pointer;border-radius:28px;height:56px;font-weight:600;font-size:14px;white-space:nowrap;color:#505050;transition:color .3s ease">Gas</button>
         <button data-fuel="Both" style="position:relative;z-index:1;${lo.isWide?'flex:0 0 auto;padding:0 24px':'flex:1'};border:0;background:transparent;cursor:pointer;border-radius:28px;height:56px;font-weight:600;font-size:14px;white-space:nowrap;color:#505050;transition:color .3s ease">Both</button>
       </div>
-      <div id="addon-filters" style="display:flex;gap:16px"></div>
+      <div id="addon-filters" style="display:none;gap:16px"></div>
       <div id="results-bar" style="display:${lo.isWide?'flex':'none'};${(S.vw<1400)?'flex:1 1 100%':'flex:1 1 320px;min-width:280px'};align-items:center;justify-content:${(S.vw<1400)?'space-between':'flex-end'};gap:16px">
         <span id="results-count" style="font-weight:400;font-size:15px;color:#505050;white-space:nowrap"></span>
         <div style="display:flex;gap:8px">
@@ -626,19 +683,10 @@ function updateCarousel(){
 function updateCounts(){
   const plans=activePlans();
   const n=plans.length,noun=n===1?'plan':'plans';
-  const{fuel,addons}=S;
-  const active=['Solar','EV','Battery'].filter(k=>addons[k]);
-  let lead,bold;
-  if(fuel==='Gas'||active.length===0){lead=`Showing ${n} popular ${noun} for your home`;bold='';}
-  else{
-    const map={Solar:'solar',EV:'EV',Battery:'battery'};
-    const names=active.map(k=>map[k]);
-    const joined=names.length===1?names[0]:names.length===2?names[0]+' & '+names[1]:names.slice(0,-1).join(', ')+' & '+names[names.length-1];
-    lead=`Showing ${n} ${noun} for your `;bold=joined;
-  }
+  const st=STATES.find(s=>s.id===S.matrixState);
+  const txt=`Showing ${n} ${noun}<span style="font-weight:700;color:#232323"> — ${st?st.label:''}</span>`;
   const mc=document.getElementById('mobile-count');
   const rc=document.getElementById('results-count');
-  const txt=`${lead}<span style="font-weight:700;color:#232323">${bold}</span>`;
   if(mc) mc.innerHTML=txt;
   if(rc) rc.innerHTML=txt;
 }
@@ -1110,6 +1158,117 @@ function bindGlobalEvents(){
 }
 
 /* ── Init ────────────────────────────────────────────────────── */
+/* ══ LAB toolbar + matrix editor ════════════════════════════════ */
+let _W=null,_tab='incl',_rankState='default';
+function saveMatrix(){try{localStorage.setItem('cp_lab_matrix',JSON.stringify(S.matrix));}catch(e){}}
+function labToast(msg){
+  let t=document.getElementById('lab-toast');
+  if(!t){t=document.createElement('div');t.id='lab-toast';
+    t.style.cssText='position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:#1FA86B;color:#fff;font:600 14px/1 gordita,sans-serif;padding:12px 18px;border-radius:10px;z-index:10001;box-shadow:0 6px 24px rgba(0,0,0,.25);opacity:0;transition:opacity .2s';
+    document.body.appendChild(t);}
+  t.textContent=msg;t.style.opacity='1';clearTimeout(t._h);t._h=setTimeout(()=>t.style.opacity='0',1600);
+}
+function setMatrixState(id){
+  S.matrixState=id;
+  const sel=document.getElementById('lab-state');if(sel&&sel.value!==id)sel.value=id;
+  updateCarousel();
+  if(_car)_car.scrollLeft=0;
+}
+function renderLabBar(){
+  const bar=document.getElementById('lab-bar');
+  const opts=STATES.map(s=>`<option value="${s.id}"${s.id===S.matrixState?' selected':''}>${s.label}</option>`).join('');
+  bar.innerHTML=`<span style="font-weight:700;font-size:13px;letter-spacing:.04em;background:#FF6024;color:#fff;padding:5px 9px;border-radius:7px">🧪 LAB</span>
+  <span style="font-weight:500;font-size:13px;color:#cfcfcf">State</span>
+  <select id="lab-state" style="font-family:gordita;font-weight:600;font-size:13px;border:0;border-radius:8px;padding:8px 10px;background:#fff;color:#232323;cursor:pointer;max-width:200px">${opts}</select>
+  <button id="lab-edit" style="font-family:gordita;font-weight:600;font-size:13px;border:0;border-radius:8px;padding:9px 14px;background:#FFB233;color:#232323;cursor:pointer">Edit matrix</button>
+  <button id="lab-reset" title="Reset matrix to defaults" style="font-family:gordita;font-weight:600;font-size:13px;border:1px solid #555;border-radius:8px;padding:9px 12px;background:transparent;color:#fff;cursor:pointer">Reset</button>`;
+  document.getElementById('lab-state').addEventListener('change',e=>setMatrixState(e.target.value));
+  document.getElementById('lab-edit').addEventListener('click',openEditor);
+  document.getElementById('lab-reset').addEventListener('click',()=>{
+    if(!confirm('Reset the display matrix to defaults? This clears your saved changes.'))return;
+    S.matrix=labClone(DEFAULT_MATRIX);saveMatrix();updateCarousel();labToast('Matrix reset to defaults');
+  });
+}
+function openEditor(){_W=labClone(S.matrix);_tab='incl';_rankState=S.matrixState;document.getElementById('lab-layer').style.display='block';renderEditor();}
+function closeEditor(){document.getElementById('lab-layer').style.display='none';document.getElementById('lab-layer').innerHTML='';}
+function renderEditor(){
+  const layer=document.getElementById('lab-layer');
+  const tabBtn=(id,label)=>`<button data-tab="${id}" style="font-family:gordita;font-weight:600;font-size:13px;border:0;border-bottom:2px solid ${_tab===id?'#232323':'transparent'};background:transparent;color:${_tab===id?'#232323':'#909090'};padding:10px 14px;cursor:pointer">${label}</button>`;
+  let body='';
+  if(_tab==='incl'){
+    const head=`<th style="position:sticky;left:0;background:#fff;text-align:left;padding:8px 10px;font-size:12px;color:#505050;min-width:200px;z-index:1">Plan</th>`+
+      STATES.map(s=>`<th style="padding:8px 6px;font-size:11px;color:#505050;font-weight:600;white-space:nowrap" title="${s.label}">${s.short}</th>`).join('');
+    const rows=CATALOG_ORDER.map(id=>{
+      const p=CATALOG[id];if(!p)return'';
+      const cells=STATES.map(s=>{const on=(_W[s.id]||[]).includes(id);
+        return `<td style="text-align:center;padding:6px 6px"><input type="checkbox" data-incl-plan="${id}" data-incl-state="${s.id}"${on?' checked':''} style="width:18px;height:18px;cursor:pointer;accent-color:#FF6024"></td>`;}).join('');
+      return `<tr style="border-top:1px solid #EEE"><td style="position:sticky;left:0;background:#fff;padding:8px 10px;font-size:13px;color:#232323;z-index:1"><strong>${p.name.replace('Origin ','')}</strong> <span style="color:#909090">(${p.discount}%)</span></td>${cells}</tr>`;
+    }).join('');
+    body=`<p style="font-size:13px;color:#505050;margin:0 0 10px">Tick which plans appear in each state. Use the <strong>Ranking</strong> tab to set their order.</p>
+    <div style="overflow:auto;border:1px solid #EEE;border-radius:10px;max-height:52vh"><table style="border-collapse:collapse;width:100%"><thead><tr style="background:#fff;position:sticky;top:0;z-index:2">${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  } else {
+    const stOpts=STATES.map(s=>`<option value="${s.id}"${s.id===_rankState?' selected':''}>${s.label}</option>`).join('');
+    const list=(_W[_rankState]||[]);
+    const items=list.length?list.map((id,i)=>{const p=CATALOG[id];
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #EEE;border-radius:10px;margin-bottom:8px;background:#fff">
+        <span style="width:26px;height:26px;border-radius:50%;background:#232323;color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center">${i+1}</span>
+        <span style="flex:1;font-size:14px;color:#232323"><strong>${p?p.name:id}</strong> <span style="color:#909090">(${p?p.discount:'?'}%)</span></span>
+        <button data-rank-up="${i}" ${i===0?'disabled':''} style="border:1px solid #D8D8D8;background:#fff;border-radius:6px;width:30px;height:30px;cursor:pointer;font-size:14px;opacity:${i===0?.4:1}">▲</button>
+        <button data-rank-down="${i}" ${i===list.length-1?'disabled':''} style="border:1px solid #D8D8D8;background:#fff;border-radius:6px;width:30px;height:30px;cursor:pointer;font-size:14px;opacity:${i===list.length-1?.4:1}">▼</button>
+        <button data-rank-remove="${i}" title="Remove" style="border:1px solid #F0C0C0;background:#fff;color:#D44;border-radius:6px;width:30px;height:30px;cursor:pointer;font-size:16px">×</button>
+      </div>`;}).join(''):`<p style="color:#909090;font-size:13px">No plans in this state yet — add some on the Inclusion tab.</p>`;
+    body=`<div style="display:flex;align-items:center;gap:10px;margin:0 0 12px"><span style="font-size:13px;color:#505050">Order for state:</span>
+      <select id="rank-state" style="font-family:gordita;font-weight:600;font-size:13px;border:1px solid #D8D8D8;border-radius:8px;padding:8px 10px;cursor:pointer">${stOpts}</select></div>
+      <p style="font-size:13px;color:#505050;margin:0 0 10px">Top of the list = leftmost card (rank 1).</p>${items}`;
+  }
+  layer.innerHTML=`<div id="lab-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:980px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.3);font-family:gordita,sans-serif">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid #EEE">
+        <span style="font-weight:700;font-size:18px;color:#232323">Plan display matrix</span>
+        <button id="lab-close" style="border:0;background:#F2F2F2;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:18px;color:#505050">×</button>
+      </div>
+      <div style="display:flex;gap:4px;padding:0 18px;border-bottom:1px solid #EEE">${tabBtn('incl','Inclusion')}${tabBtn('rank','Ranking')}</div>
+      <div style="padding:18px 22px;overflow:auto">${body}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 22px;border-top:1px solid #EEE">
+        <button id="lab-reset-editor" style="font-family:gordita;font-weight:600;font-size:13px;border:1px solid #D8D8D8;background:#fff;border-radius:8px;padding:10px 14px;cursor:pointer;color:#505050">Reset to defaults</button>
+        <div style="display:flex;gap:10px">
+          <button id="lab-cancel" style="font-family:gordita;font-weight:600;font-size:14px;border:1px solid #D8D8D8;background:#fff;border-radius:10px;padding:11px 18px;cursor:pointer;color:#232323">Cancel</button>
+          <button id="lab-save" style="font-family:gordita;font-weight:600;font-size:14px;border:0;background:#1FA86B;color:#fff;border-radius:10px;padding:11px 20px;cursor:pointer">Save + Preview</button>
+        </div>
+      </div>
+    </div></div>`;
+  // wire
+  layer.querySelector('#lab-close').onclick=closeEditor;
+  layer.querySelector('#lab-cancel').onclick=closeEditor;
+  layer.querySelector('#lab-backdrop').addEventListener('mousedown',e=>{if(e.target.id==='lab-backdrop')closeEditor();});
+  layer.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{_tab=b.dataset.tab;renderEditor();});
+  layer.querySelector('#lab-reset-editor').onclick=()=>{if(confirm('Reset to default matrix?')){_W=labClone(DEFAULT_MATRIX);renderEditor();}};
+  layer.querySelector('#lab-save').onclick=()=>{S.matrix=_W;saveMatrix();closeEditor();
+    if(!S.matrix[S.matrixState]||!S.matrix[S.matrixState].length){/* keep state */}
+    updateCarousel();if(_car)_car.scrollLeft=0;labToast('Saved — previewing “'+(STATES.find(s=>s.id===S.matrixState)||{}).label+'”');};
+  if(_tab==='incl'){
+    layer.querySelectorAll('[data-incl-plan]').forEach(cb=>cb.addEventListener('change',()=>{
+      const id=cb.dataset.inclPlan,st=cb.dataset.inclState;_W[st]=_W[st]||[];
+      const idx=_W[st].indexOf(id);
+      if(cb.checked&&idx<0)_W[st].push(id); else if(!cb.checked&&idx>=0)_W[st].splice(idx,1);
+    }));
+  } else {
+    layer.querySelector('#rank-state').addEventListener('change',e=>{_rankState=e.target.value;renderEditor();});
+    layer.querySelectorAll('[data-rank-up]').forEach(b=>b.onclick=()=>{const i=+b.dataset.rankUp;const a=_W[_rankState];[a[i-1],a[i]]=[a[i],a[i-1]];renderEditor();});
+    layer.querySelectorAll('[data-rank-down]').forEach(b=>b.onclick=()=>{const i=+b.dataset.rankDown;const a=_W[_rankState];[a[i+1],a[i]]=[a[i],a[i+1]];renderEditor();});
+    layer.querySelectorAll('[data-rank-remove]').forEach(b=>b.onclick=()=>{const i=+b.dataset.rankRemove;_W[_rankState].splice(i,1);renderEditor();});
+  }
+}
+function labInit(){
+  let bar=document.getElementById('lab-bar');
+  if(!bar){bar=document.createElement('div');bar.id='lab-bar';
+    bar.style.cssText='position:fixed;left:50%;bottom:16px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:#232323;padding:9px 12px;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.28);z-index:9998';
+    document.body.appendChild(bar);}
+  let layer=document.getElementById('lab-layer');
+  if(!layer){layer=document.createElement('div');layer.id='lab-layer';layer.style.display='none';document.body.appendChild(layer);}
+  renderLabBar();
+}
+
 function init(){
   buildShell();
   cacheRefs();
@@ -1117,6 +1276,7 @@ function init(){
   _curR=makeCursor('M20 15 L28 23 L20 31');
   bindShellEvents();
   bindGlobalEvents();
+  labInit();
   updateAll();
   updateSearch();
 }
