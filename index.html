@@ -1210,15 +1210,12 @@ function openEditor(){_W={};STATES.forEach(s=>{_W[s.id]=deriveRanks(S.matrix[s.i
 function closeEditor(){const l=document.getElementById('lab-layer');l.style.display='none';l.innerHTML='';}
 function renderEditor(){
   const layer=document.getElementById('lab-layer');
-  const MAXR=CATALOG_ORDER.length;
   const head=`<th style="position:sticky;left:0;background:#fff;text-align:left;padding:8px 10px;font-size:12px;color:#505050;min-width:190px;z-index:1">Plan</th>`+
     STATES.map(s=>`<th style="padding:8px 6px;font-size:11px;color:#505050;font-weight:600;white-space:nowrap" title="${s.label}">${s.short}</th>`).join('');
   const rows=CATALOG_ORDER.map(id=>{
     const p=CATALOG[id];if(!p)return'';
-    const cells=STATES.map(s=>{const cur=(_W[s.id]&&_W[s.id][id])||0,on=cur>0;
-      let opts='';for(let n=0;n<=MAXR;n++)opts+=`<option value="${n}"${n===cur?' selected':''}>${n===0?'—':n}</option>`;
-      const st=on?'background:#FFF1E8;border-color:#FF6024;color:#C2410C;font-weight:700':'background:#fff;border-color:#E0E0E0;color:#B0B0B0';
-      return `<td style="text-align:center;padding:5px 5px"><select data-rk-plan="${id}" data-rk-state="${s.id}" style="font-family:gordita;font-size:13px;border:1px solid #E0E0E0;border-radius:7px;padding:5px 4px;cursor:pointer;${st}">${opts}</select></td>`;}).join('');
+    const cells=STATES.map(s=>{const cur=(_W[s.id]&&_W[s.id][id])||0;
+      return `<td style="text-align:center;padding:5px 5px"><input type="text" inputmode="numeric" maxlength="2" data-rk-plan="${id}" data-rk-state="${s.id}" value="${cur>0?cur:''}" placeholder="—" style="width:46px;text-align:center;font-family:gordita;font-size:13px;border:1px solid #E0E0E0;border-radius:7px;padding:6px 4px;outline:none"></td>`;}).join('');
     return `<tr style="border-top:1px solid #EEE"><td style="position:sticky;left:0;background:#fff;padding:8px 10px;font-size:13px;color:#232323;z-index:1"><strong>${p.name.replace('Origin ','')}</strong> <span style="color:#909090">(${p.discount}%)</span></td>${cells}</tr>`;
   }).join('');
   layer.innerHTML=`<div id="lab-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px">
@@ -1227,7 +1224,10 @@ function renderEditor(){
         <span style="font-weight:700;font-size:18px;color:#232323">Plan display matrix</span>
         <button id="lab-close" style="border:0;background:#F2F2F2;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:18px;color:#505050">×</button>
       </div>
-      <div style="padding:16px 22px 0"><p style="font-size:13px;color:#505050;margin:0 0 12px">Set a rank per state. <strong>Higher number = appears first</strong> (and animates in first); <strong>—</strong> = hidden. Ties fall back to the list order below.</p></div>
+      <div style="padding:16px 22px 0">
+        <p style="font-size:13px;color:#505050;margin:0 0 10px">Type a rank per state (whole numbers). <strong>Higher number = appears first</strong> (and animates in first); <strong>blank</strong> = hidden. Each rank must be unique within a state; gaps are closed up on save (1, 3, 7 → 1, 2, 3).</p>
+        <div id="lab-err" style="display:none;background:#FFE9F2;color:#B0006B;border:1px solid #F5B5D3;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;margin:0 0 12px"></div>
+      </div>
       <div style="padding:0 22px 18px;overflow:auto"><div style="overflow:auto;border:1px solid #EEE;border-radius:10px;max-height:56vh"><table style="border-collapse:collapse;width:100%"><thead><tr style="background:#fff;position:sticky;top:0;z-index:2">${head}</tr></thead><tbody>${rows}</tbody></table></div></div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 22px;border-top:1px solid #EEE">
         <button id="lab-reset-editor" style="font-family:gordita;font-weight:600;font-size:13px;border:1px solid #D8D8D8;background:#fff;border-radius:8px;padding:10px 14px;cursor:pointer;color:#505050">Reset to defaults</button>
@@ -1241,17 +1241,37 @@ function renderEditor(){
   layer.querySelector('#lab-cancel').onclick=closeEditor;
   layer.querySelector('#lab-backdrop').addEventListener('mousedown',e=>{if(e.target.id==='lab-backdrop')closeEditor();});
   layer.querySelector('#lab-reset-editor').onclick=()=>{if(confirm('Reset to default matrix?')){_W={};STATES.forEach(s=>{_W[s.id]=deriveRanks(DEFAULT_MATRIX[s.id]||[]);});renderEditor();}};
+  const inputs=[...layer.querySelectorAll('[data-rk-plan]')];
+  function validate(){
+    const bad=[],errKeys=new Set();
+    STATES.forEach(s=>{
+      const seen={};Object.keys(_W[s.id]||{}).forEach(pid=>{const v=_W[s.id][pid];if(v>0)(seen[v]=seen[v]||[]).push(pid);});
+      let dup=false;Object.keys(seen).forEach(v=>{if(seen[v].length>1){dup=true;seen[v].forEach(pid=>errKeys.add(s.id+'|'+pid));}});
+      if(dup)bad.push(s.short);
+    });
+    inputs.forEach(inp=>{const st=inp.dataset.rkState,id=inp.dataset.rkPlan,v=(_W[st]&&_W[st][id])||0,on=v>0,dup=errKeys.has(st+'|'+id);
+      inp.style.borderColor=dup?'#E5006D':(on?'#FF6024':'#E0E0E0');
+      inp.style.background=dup?'#FFE9F2':(on?'#FFF1E8':'#fff');
+      inp.style.color=dup?'#B0006B':(on?'#C2410C':'#909090');
+      inp.style.fontWeight=(on||dup)?'700':'400';
+    });
+    const err=layer.querySelector('#lab-err'),save=layer.querySelector('#lab-save');
+    if(bad.length){err.style.display='block';err.textContent='Duplicate ranks in: '+bad.join(', ')+' — each rank must be unique within a state.';save.disabled=true;save.style.opacity='.45';save.style.cursor='not-allowed';}
+    else{err.style.display='none';save.disabled=false;save.style.opacity='1';save.style.cursor='pointer';}
+  }
+  inputs.forEach(inp=>inp.addEventListener('input',()=>{
+    inp.value=inp.value.replace(/\D/g,'').slice(0,2);
+    const st=inp.dataset.rkState,id=inp.dataset.rkPlan;_W[st]=_W[st]||{};_W[st][id]=inp.value===''?0:parseInt(inp.value,10);
+    validate();
+  }));
   layer.querySelector('#lab-save').onclick=()=>{
+    const save=layer.querySelector('#lab-save');if(save.disabled)return;
     const m={};STATES.forEach(s=>{m[s.id]=ranksToOrder(_W[s.id]||{});});
     S.matrix=m;saveMatrix();updateURL();closeEditor();
     if(_car)_car.scrollLeft=0;S._entrance=true;updateCarousel();S._entrance=false;
     labToast('Saved — previewing “'+((STATES.find(s=>s.id===S.matrixState)||{}).label||'')+'”');
   };
-  layer.querySelectorAll('[data-rk-plan]').forEach(sel=>sel.addEventListener('change',()=>{
-    const id=sel.dataset.rkPlan,st=sel.dataset.rkState,v=+sel.value;
-    _W[st]=_W[st]||{};_W[st][id]=v;const on=v>0;
-    sel.style.background=on?'#FFF1E8':'#fff';sel.style.borderColor=on?'#FF6024':'#E0E0E0';sel.style.color=on?'#C2410C':'#B0B0B0';sel.style.fontWeight=on?'700':'400';
-  }));
+  validate();
 }
 function labInit(){
   let bar=document.getElementById('lab-bar');
