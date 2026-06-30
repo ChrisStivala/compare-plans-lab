@@ -1225,7 +1225,7 @@ function renderEditor(){
   const rows=CATALOG_ORDER.map(id=>{
     const p=CATALOG[id];if(!p)return'';
     const cells=STATES.map(s=>{const cur=(_W[s.id]&&_W[s.id][id])||0;
-      return `<td style="padding:0;border:1px solid #EAEAEA"><input type="text" inputmode="numeric" maxlength="2" readonly data-rk-plan="${id}" data-rk-state="${s.id}" value="${cur>0?cur:''}" placeholder="—" style="display:block;width:56px;height:38px;box-sizing:border-box;text-align:center;font-family:gordita;font-size:13px;border:0;border-radius:0;background:transparent;outline:none;cursor:cell;color:#B0B0B0"></td>`;}).join('');
+      return `<td style="padding:0;border:1px solid #EAEAEA;min-width:58px"><input type="text" inputmode="numeric" maxlength="2" readonly data-rk-plan="${id}" data-rk-state="${s.id}" value="${cur>0?cur:''}" placeholder="—" style="display:block;width:100%;height:40px;box-sizing:border-box;text-align:center;font-family:gordita;font-size:13px;border:0;border-radius:0;background:transparent;outline:none;cursor:cell;color:#B0B0B0"></td>`;}).join('');
     return `<tr><td data-row="${id}" title="Click to select the whole row" style="position:sticky;left:0;background:#fff;padding:8px 10px;font-size:13px;color:#232323;z-index:1;cursor:pointer;user-select:none;border:1px solid #EAEAEA"><strong>${p.name.replace('Origin ','')}</strong> <span style="color:#909090">(${p.discount}%)</span></td>${cells}</tr>`;
   }).join('');
   layer.innerHTML=`<div id="lab-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px">
