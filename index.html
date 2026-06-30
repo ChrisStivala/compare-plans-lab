@@ -189,6 +189,17 @@ const DEFAULT_MATRIX={
   solarBattery:['go','solar','batteryStarter','battery'],
   solarEvBattery:['go','night','batteryStarter','battery']
 };
+// Maps the Solar/EV/Battery filter combination to a matrix state, and back.
+const STATE_ADDONS={
+  default:{},smart:{},basicMeter:{},
+  solar:{Solar:true},ev:{EV:true},battery:{Battery:true},
+  solarEv:{Solar:true,EV:true},evBattery:{EV:true,Battery:true},
+  solarBattery:{Solar:true,Battery:true},solarEvBattery:{Solar:true,EV:true,Battery:true}
+};
+function addonsToState(a){
+  const k=(a.Solar?'S':'')+(a.EV?'E':'')+(a.Battery?'B':'');
+  return {'':null,'S':'solar','E':'ev','B':'battery','SE':'solarEv','EB':'evBattery','SB':'solarBattery','SEB':'solarEvBattery'}[k];
+}
 function labClone(o){return JSON.parse(JSON.stringify(o));}
 function loadMatrix(){
   try{const s=localStorage.getItem('cp_lab_matrix');if(s){const m=JSON.parse(s);
@@ -617,7 +628,7 @@ function buildShell(){
         <button data-fuel="Gas" style="position:relative;z-index:1;${lo.isWide?'flex:0 0 auto;padding:0 24px':'flex:1'};border:0;background:transparent;cursor:pointer;border-radius:28px;height:56px;font-weight:600;font-size:14px;white-space:nowrap;color:#505050;transition:color .3s ease">Gas</button>
         <button data-fuel="Both" style="position:relative;z-index:1;${lo.isWide?'flex:0 0 auto;padding:0 24px':'flex:1'};border:0;background:transparent;cursor:pointer;border-radius:28px;height:56px;font-weight:600;font-size:14px;white-space:nowrap;color:#505050;transition:color .3s ease">Both</button>
       </div>
-      <div id="addon-filters" style="display:none;gap:16px"></div>
+      <div id="addon-filters" style="display:flex;gap:16px"></div>
       <div id="results-bar" style="display:${lo.isWide?'flex':'none'};${(S.vw<1400)?'flex:1 1 100%':'flex:1 1 320px;min-width:280px'};align-items:center;justify-content:${(S.vw<1400)?'space-between':'flex-end'};gap:16px">
         <span id="results-count" style="font-weight:400;font-size:15px;color:#505050;white-space:nowrap"></span>
         <div style="display:flex;gap:8px">
@@ -802,29 +813,13 @@ function updateGasStyles(){
 /* ── Addon toggle ───────────────────────────────────────────── */
 let _exitTimers={},_enterTimers={},_exitRafs={};
 function toggleAddon(name){
-  const id={Solar:'solar',EV:'night',Battery:'battery'}[name];
-  const isOn=!!S.addons[name];
-  clearTimeout(_exitTimers[id]);delete _exitTimers[id];
-  clearTimeout(_enterTimers[id]);delete _enterTimers[id];
-  cancelAnimationFrame(_exitRafs[id]);delete _exitRafs[id];
-
-  if(!isOn){
-    const ex={...S.exiting};delete ex[id];
-    S.addons={...S.addons,[name]:true};
-    S.entering={...S.entering,[id]:true};
-    S.exiting=ex;
-    updateCarousel();updateAddonFilters();
-    // New card is inserted at the front; scroll the carousel to it so the
-    // swoop-in animation is in frame (especially on mobile when scrolled over).
-    if(_car) smoothScrollX(_car,0,520);
-    _enterTimers[id]=setTimeout(()=>{delete _enterTimers[id];const en={...S.entering};delete en[id];S.entering=en;},600);
-  } else {
-    const en={...S.entering};delete en[id];
-    S.addons={...S.addons,[name]:false};
-    S.exiting={...S.exiting,[id]:true};
-    S.entering=en;
-    updateCarousel();updateAddonFilters();
-    _exitTimers[id]=setTimeout(()=>{delete _exitTimers[id];const ex={...S.exiting};delete ex[id];S.exiting=ex;updateCarousel();},340);
+  if(S.fuel==='Gas')return;
+  const next={...S.addons,[name]:!S.addons[name]};
+  const st=addonsToState(next);
+  if(st){ setMatrixState(st); }
+  else { // no add-ons selected → fall back to a no-addon state
+    const noAddon=['default','smart','basicMeter'];
+    setMatrixState(noAddon.includes(S.matrixState)?S.matrixState:'default');
   }
 }
 
@@ -1170,7 +1165,10 @@ function labToast(msg){
 }
 function setMatrixState(id){
   S.matrixState=id;
+  // keep the Solar/EV/Battery checkboxes in sync with the selected state
+  S.addons={Solar:false,EV:false,Battery:false,...(STATE_ADDONS[id]||{})};
   const sel=document.getElementById('lab-state');if(sel&&sel.value!==id)sel.value=id;
+  updateAddonFilters();
   updateCarousel();
   if(_car)_car.scrollLeft=0;
 }
