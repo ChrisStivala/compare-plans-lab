@@ -182,13 +182,13 @@ const DEFAULT_MATRIX={
   default:['go','edr','wd'],
   smart:['go','edr','wd'],
   basicMeter:['go','edr','basic'],
-  solar:['go','edr','solar','wd'],
-  ev:['go','edr','wd','night'],
-  battery:['go','edr','wd','battery'],
-  solarEv:['go','edr','solar','wd','night'],
-  evBattery:['go','edr','wd','night','battery'],
-  solarBattery:['go','edr','solar','wd','battery'],
-  solarEvBattery:['go','edr','solar','wd','night','battery']
+  solar:['solar','go','edr','wd'],
+  ev:['night','go','edr','wd'],
+  battery:['battery','go','edr','wd'],
+  solarEv:['night','solar','go','edr','wd'],
+  evBattery:['battery','night','go','edr','wd'],
+  solarBattery:['battery','solar','go','edr','wd'],
+  solarEvBattery:['battery','night','solar','go','edr','wd']
 };
 // Maps the Solar/EV/Battery filter combination to a matrix state, and back.
 const STATE_ADDONS={
@@ -269,7 +269,6 @@ function cardHTML(plan,lo,idx){
   const cWidth=isWide?(cw+'px'):'300px';
   const slotPx=isWide?(cw+cgap):308;
   const anim=(exiting&&exiting[plan.id])?'cpCardOut .34s cubic-bezier(.16,.84,.44,1) both'
-    :S._entrance?`cpCardEnter .5s cubic-bezier(.22,.61,.36,1) ${Math.min(idx||0,8)*80}ms both`
     :(entering&&entering[plan.id])?'cpCardIn .58s cubic-bezier(.34,1.28,.5,1) both':'none';
 
   const gTrans=gasInstant?'none':'grid-template-rows .44s cubic-bezier(.4,0,.2,1),margin-top .44s cubic-bezier(.4,0,.2,1),opacity .3s ease';
@@ -1162,7 +1161,7 @@ function bindGlobalEvents(){
 
 /* ── Init ────────────────────────────────────────────────────── */
 /* ══ LAB toolbar + matrix editor ════════════════════════════════ */
-let _W=null; // working ranks: { stateId: { planId: rank } } (0 = hidden)
+let _W=null,_sel=new Set(),_labKey=null; // working ranks + multi-cell selection
 function deriveRanks(arr){const r={};const n=arr.length;arr.forEach((id,i)=>r[id]=n-i);return r;}
 function ranksToOrder(ranks){return Object.keys(ranks).filter(id=>ranks[id]>0&&CATALOG[id])
   .sort((a,b)=>(ranks[b]-ranks[a])||(CATALOG_ORDER.indexOf(a)-CATALOG_ORDER.indexOf(b)));}
@@ -1174,14 +1173,25 @@ function labToast(msg){
     document.body.appendChild(t);}
   t.textContent=msg;t.style.opacity='1';clearTimeout(t._h);t._h=setTimeout(()=>t.style.opacity='0',1600);
 }
+let _labEnterTimer=null;
+// Re-render the carousel, swooping in any plans that are newly present
+// (compared to prevIds) — mirrors the production add-on entrance animation.
+function labReflow(prevIds){
+  const nextIds=activePlans().map(p=>p.id);
+  const en={};nextIds.forEach(pid=>{if(prevIds.indexOf(pid)<0)en[pid]=true;});
+  S.entering=en;S.exiting={};
+  updateCarousel();
+  clearTimeout(_labEnterTimer);_labEnterTimer=setTimeout(()=>{S.entering={};},680);
+}
 function setMatrixState(id){
+  const prev=activePlans().map(p=>p.id);
   S.matrixState=id;
   // keep the Solar/EV/Battery checkboxes in sync with the selected state
   S.addons={Solar:false,EV:false,Battery:false,...(STATE_ADDONS[id]||{})};
   const sel=document.getElementById('lab-state');if(sel&&sel.value!==id)sel.value=id;
   updateAddonFilters();
   if(_car)_car.scrollLeft=0;
-  S._entrance=true;updateCarousel();S._entrance=false;
+  labReflow(prev);
   updateURL();
 }
 function renderLabBar(){
@@ -1202,16 +1212,16 @@ function renderLabBar(){
   });
   document.getElementById('lab-reset').addEventListener('click',()=>{
     if(!confirm('Reset the display matrix to defaults? This clears your saved changes.'))return;
-    S.matrix=labClone(DEFAULT_MATRIX);saveMatrix();updateURL();
-    S._entrance=true;updateCarousel();S._entrance=false;labToast('Matrix reset to defaults');
+    const prev=activePlans().map(p=>p.id);
+    S.matrix=labClone(DEFAULT_MATRIX);saveMatrix();updateURL();labReflow(prev);labToast('Matrix reset to defaults');
   });
 }
-function openEditor(){_W={};STATES.forEach(s=>{_W[s.id]=deriveRanks(S.matrix[s.id]||[]);});document.getElementById('lab-layer').style.display='block';renderEditor();}
-function closeEditor(){const l=document.getElementById('lab-layer');l.style.display='none';l.innerHTML='';}
+function openEditor(){_W={};_sel.clear();STATES.forEach(s=>{_W[s.id]=deriveRanks(S.matrix[s.id]||[]);});document.getElementById('lab-layer').style.display='block';renderEditor();}
+function closeEditor(){const l=document.getElementById('lab-layer');l.style.display='none';l.innerHTML='';if(_labKey){document.removeEventListener('keydown',_labKey);_labKey=null;}}
 function renderEditor(){
   const layer=document.getElementById('lab-layer');
   const head=`<th style="position:sticky;left:0;background:#fff;text-align:left;padding:8px 10px;font-size:12px;color:#505050;min-width:190px;z-index:1">Plan</th>`+
-    STATES.map(s=>`<th style="padding:8px 6px;font-size:11px;color:#505050;font-weight:600;white-space:nowrap" title="${s.label}">${s.short}</th>`).join('');
+    STATES.map(s=>`<th data-col="${s.id}" title="Click to select the whole ${s.label} column" style="padding:8px 6px;font-size:11px;color:#505050;font-weight:600;white-space:nowrap;cursor:pointer;user-select:none">${s.short}</th>`).join('');
   const rows=CATALOG_ORDER.map(id=>{
     const p=CATALOG[id];if(!p)return'';
     const cells=STATES.map(s=>{const cur=(_W[s.id]&&_W[s.id][id])||0;
@@ -1225,10 +1235,17 @@ function renderEditor(){
         <button id="lab-close" style="border:0;background:#F2F2F2;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:18px;color:#505050">×</button>
       </div>
       <div style="padding:16px 22px 0">
-        <p style="font-size:13px;color:#505050;margin:0 0 10px">Type a rank per state (whole numbers). <strong>Higher number = appears first</strong> (and animates in first); <strong>blank</strong> = hidden. Each rank must be unique within a state; gaps are closed up on save (1, 3, 7 → 1, 2, 3).</p>
+        <p style="font-size:13px;color:#505050;margin:0 0 10px">Type a rank per state (whole numbers). <strong>Higher number = appears first</strong>; <strong>blank</strong> = hidden. Ranks are unique per state; gaps close on save (1, 3, 7 → 1, 2, 3). <strong>Ctrl/⌘-click</strong> cells (or click a column header) to multi-select, then bulk set or clear.</p>
         <div id="lab-err" style="display:none;background:#FFE9F2;color:#B0006B;border:1px solid #F5B5D3;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;margin:0 0 12px"></div>
+        <div id="lab-bulk" style="display:none;align-items:center;gap:10px;background:#EAF1FF;border:1px solid #B9D2FF;border-radius:10px;padding:9px 12px;margin:0 0 12px">
+          <span id="lab-bulk-n" style="font-size:13px;font-weight:700;color:#2D5FB0"></span>
+          <input id="lab-bulk-val" type="text" inputmode="numeric" maxlength="2" placeholder="rank" style="width:64px;text-align:center;font-family:gordita;font-size:13px;border:1px solid #B9D2FF;border-radius:7px;padding:7px 6px;outline:none">
+          <button id="lab-bulk-apply" style="font-family:gordita;font-weight:600;font-size:13px;border:0;background:#2D7FF9;color:#fff;border-radius:8px;padding:8px 14px;cursor:pointer">Set</button>
+          <button id="lab-bulk-clear" style="font-family:gordita;font-weight:600;font-size:13px;border:1px solid #B9D2FF;background:#fff;color:#2D5FB0;border-radius:8px;padding:8px 12px;cursor:pointer">Clear</button>
+          <button id="lab-bulk-deselect" style="font-family:gordita;font-weight:600;font-size:13px;border:0;background:transparent;color:#2D5FB0;border-radius:8px;padding:8px 8px;cursor:pointer">Deselect</button>
+        </div>
       </div>
-      <div style="padding:0 22px 18px;overflow:auto"><div style="overflow:auto;border:1px solid #EEE;border-radius:10px;max-height:56vh"><table style="border-collapse:collapse;width:100%"><thead><tr style="background:#fff;position:sticky;top:0;z-index:2">${head}</tr></thead><tbody>${rows}</tbody></table></div></div>
+      <div style="padding:0 22px 18px;overflow:auto"><div style="overflow:auto;border:1px solid #EEE;border-radius:10px;max-height:54vh"><table style="border-collapse:collapse;width:100%"><thead><tr style="background:#fff;position:sticky;top:0;z-index:2">${head}</tr></thead><tbody>${rows}</tbody></table></div></div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 22px;border-top:1px solid #EEE">
         <button id="lab-reset-editor" style="font-family:gordita;font-weight:600;font-size:13px;border:1px solid #D8D8D8;background:#fff;border-radius:8px;padding:10px 14px;cursor:pointer;color:#505050">Reset to defaults</button>
         <div style="display:flex;gap:10px">
@@ -1240,8 +1257,9 @@ function renderEditor(){
   layer.querySelector('#lab-close').onclick=closeEditor;
   layer.querySelector('#lab-cancel').onclick=closeEditor;
   layer.querySelector('#lab-backdrop').addEventListener('mousedown',e=>{if(e.target.id==='lab-backdrop')closeEditor();});
-  layer.querySelector('#lab-reset-editor').onclick=()=>{if(confirm('Reset to default matrix?')){_W={};STATES.forEach(s=>{_W[s.id]=deriveRanks(DEFAULT_MATRIX[s.id]||[]);});renderEditor();}};
+  layer.querySelector('#lab-reset-editor').onclick=()=>{if(confirm('Reset to default matrix?')){_W={};_sel.clear();STATES.forEach(s=>{_W[s.id]=deriveRanks(DEFAULT_MATRIX[s.id]||[]);});renderEditor();}};
   const inputs=[...layer.querySelectorAll('[data-rk-plan]')];
+  const byKey={};inputs.forEach(i=>byKey[i.dataset.rkState+'|'+i.dataset.rkPlan]=i);
   function validate(){
     const bad=[],errKeys=new Set();
     STATES.forEach(s=>{
@@ -1259,19 +1277,52 @@ function renderEditor(){
     if(bad.length){err.style.display='block';err.textContent='Duplicate ranks in: '+bad.join(', ')+' — each rank must be unique within a state.';save.disabled=true;save.style.opacity='.45';save.style.cursor='not-allowed';}
     else{err.style.display='none';save.disabled=false;save.style.opacity='1';save.style.cursor='pointer';}
   }
-  inputs.forEach(inp=>inp.addEventListener('input',()=>{
-    inp.value=inp.value.replace(/\D/g,'').slice(0,2);
-    const st=inp.dataset.rkState,id=inp.dataset.rkPlan;_W[st]=_W[st]||{};_W[st][id]=inp.value===''?0:parseInt(inp.value,10);
-    validate();
+  function updateSelUI(){
+    inputs.forEach(i=>{i.style.boxShadow=_sel.has(i.dataset.rkState+'|'+i.dataset.rkPlan)?'0 0 0 2px #2D7FF9':'none';});
+    const bar=layer.querySelector('#lab-bulk');
+    if(_sel.size){bar.style.display='flex';layer.querySelector('#lab-bulk-n').textContent=_sel.size+' cell'+(_sel.size>1?'s':'')+' selected';}
+    else bar.style.display='none';
+  }
+  function bulkSet(num){
+    _sel.forEach(k=>{const i=k.indexOf('|'),st=k.slice(0,i),id=k.slice(i+1);_W[st]=_W[st]||{};_W[st][id]=num;const el=byKey[k];if(el)el.value=num>0?num:'';});
+    validate();updateSelUI();
+  }
+  inputs.forEach(inp=>{
+    inp.addEventListener('mousedown',e=>{
+      if(e.ctrlKey||e.metaKey){e.preventDefault();const k=inp.dataset.rkState+'|'+inp.dataset.rkPlan;if(_sel.has(k))_sel.delete(k);else _sel.add(k);updateSelUI();}
+      else if(_sel.size){_sel.clear();updateSelUI();}
+    });
+    inp.addEventListener('input',()=>{
+      inp.value=inp.value.replace(/\D/g,'').slice(0,2);
+      const st=inp.dataset.rkState,id=inp.dataset.rkPlan;_W[st]=_W[st]||{};_W[st][id]=inp.value===''?0:parseInt(inp.value,10);
+      validate();
+    });
+  });
+  layer.querySelectorAll('[data-col]').forEach(th=>th.addEventListener('click',()=>{
+    const st=th.dataset.col,keys=CATALOG_ORDER.filter(id=>CATALOG[id]).map(id=>st+'|'+id);
+    const allSel=keys.every(k=>_sel.has(k));keys.forEach(k=>{if(allSel)_sel.delete(k);else _sel.add(k);});updateSelUI();
   }));
+  layer.querySelector('#lab-bulk-apply').onclick=()=>{const raw=(layer.querySelector('#lab-bulk-val').value||'').replace(/\D/g,'');bulkSet(raw===''?0:parseInt(raw,10));};
+  layer.querySelector('#lab-bulk-val').addEventListener('keydown',e=>{if(e.key==='Enter')layer.querySelector('#lab-bulk-apply').click();});
+  layer.querySelector('#lab-bulk-clear').onclick=()=>bulkSet(0);
+  layer.querySelector('#lab-bulk-deselect').onclick=()=>{_sel.clear();updateSelUI();};
   layer.querySelector('#lab-save').onclick=()=>{
     const save=layer.querySelector('#lab-save');if(save.disabled)return;
+    const prev=activePlans().map(p=>p.id);
     const m={};STATES.forEach(s=>{m[s.id]=ranksToOrder(_W[s.id]||{});});
     S.matrix=m;saveMatrix();updateURL();closeEditor();
-    if(_car)_car.scrollLeft=0;S._entrance=true;updateCarousel();S._entrance=false;
+    if(_car)_car.scrollLeft=0;labReflow(prev);
     labToast('Saved — previewing “'+((STATES.find(s=>s.id===S.matrixState)||{}).label||'')+'”');
   };
-  validate();
+  if(_labKey)document.removeEventListener('keydown',_labKey);
+  _labKey=function(e){
+    if(layer.style.display==='none')return;
+    const ae=document.activeElement,inField=ae&&ae.tagName==='INPUT';
+    if(e.key==='Escape'){if(_sel.size){_sel.clear();updateSelUI();}else closeEditor();}
+    else if((e.key==='Delete'||e.key==='Backspace')&&_sel.size&&!inField){e.preventDefault();bulkSet(0);}
+  };
+  document.addEventListener('keydown',_labKey);
+  validate();updateSelUI();
 }
 function labInit(){
   let bar=document.getElementById('lab-bar');
